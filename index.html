@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>여행경비 트래커</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C1440E">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F6F7F6; --surface:#FFFFFF; --ink:#1B2430; --ink2:#5C6570; --ink3:#98A0A8;
+    --line:#E7E9EA; --line2:#DADDE0;
+    --accent:#C1440E; --on-accent:#FFF8F3;
+    --warn:#D23C3C; --on-warn:#FFFFFF;
+    --good:#1F8A6B;
+    --shadow: 0 14px 34px -20px rgba(20,24,30,.16);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12151A; --surface:#1B1F26; --ink:#F3F4F5; --ink2:#9AA1A8; --ink3:#6B7178;
+      --line:#282D34; --line2:#333940;
+      --accent:#E2734A; --on-accent:#1B0800;
+      --warn:#E2554F; --on-warn:#1B0000;
+      --good:#39B58C;
+      --shadow: 0 14px 34px -20px rgba(0,0,0,.55);
+    }
+  }
+  [data-theme="dark"]{
+    --bg:#12151A; --surface:#1B1F26; --ink:#F3F4F5; --ink2:#9AA1A8; --ink3:#6B7178;
+    --line:#282D34; --line2:#333940;
+    --accent:#E2734A; --on-accent:#1B0800;
+    --warn:#E2554F; --on-warn:#1B0000;
+    --good:#39B58C;
+    --shadow: 0 14px 34px -20px rgba(0,0,0,.55);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Manrope','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
+  }
+  .tabular{ font-variant-numeric:tabular-nums; }
+  button, input, select, textarea{ font-family:inherit; }
+  button{ cursor:pointer; }
+  .wrap{ max-width:920px; margin:0 auto; }
+  @media (min-width:1200px){ .wrap{ max-width:1180px; } .hero-inner{ max-width:1180px !important; } }
+
+  .dispname{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; }
+
+  /* ---------- hero ---------- */
+  .hero{ padding:20px 28px 0; }
+  .hero-inner{
+    max-width:920px; margin:0 auto; background:var(--surface); color:var(--ink);
+    border:1px solid var(--line2); border-radius:18px; box-shadow:var(--shadow);
+    padding:24px 26px 22px;
+  }
+  .hero-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+  .triprow{ display:flex; align-items:center; gap:8px; }
+  .navbtn{ background:var(--line); border:none; color:var(--ink2); width:26px; height:26px; border-radius:7px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .navbtn:disabled{ opacity:.3; cursor:default; }
+  select.trippick{ background:transparent; border:none; color:var(--ink); font-weight:700; font-size:15px; max-width:52vw; }
+  .trip-daterange{ font-size:12px; color:var(--ink2); margin-top:3px; }
+  .iconrow{ display:flex; gap:8px; }
+  .iconbtn{
+    border:1px solid var(--line2); background:var(--bg); color:var(--ink2);
+    border-radius:9px; padding:6px 11px; font-size:12px; font-weight:700;
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  #installBtn{ display:none; }
+
+  .hero-stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; }
+  .hstat{ background:var(--bg); border:1px solid var(--line2); border-radius:12px; padding:11px 13px; }
+  .hstat .l{ font-size:10px; color:var(--ink2); text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-bottom:6px; }
+  .hstat .v{ font-size:16px; font-weight:700; }
+  .hstat .v.accent{ color:var(--accent); }
+  .hstat.editable .v{ cursor:text; border-bottom:1px dashed var(--ink3); display:inline-block; }
+  .hstat input.editv{
+    font-size:16px; font-weight:700; color:var(--ink); background:transparent; border:none;
+    border-bottom:1.5px solid var(--accent); width:100%; padding:0;
+  }
+  .hstat input.editv:focus{ outline:none; }
+
+  /* ---------- body ---------- */
+  .body{ padding:22px 28px 0; }
+
+  .panels{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:24px; }
+  @media (max-width:640px){ .panels{ grid-template-columns:1fr; } }
+  .panel{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:16px 16px 14px; }
+  .panel-title{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ink2); margin-bottom:12px; }
+  .donut-row{ display:flex; align-items:center; gap:16px; }
+  .donut{ width:88px; height:88px; border-radius:50%; flex-shrink:0; }
+  .donut-empty{ background:var(--line) !important; }
+  .legend{ flex:1; min-width:0; }
+  .legend-row{ display:flex; align-items:center; gap:7px; font-size:12px; margin-bottom:6px; }
+  .legend-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .legend-name{ flex-shrink:0; font-weight:600; }
+  .legend-pct{ color:var(--ink2); margin-left:auto; padding-left:8px; }
+
+  .cbar-row{ margin-bottom:10px; }
+  .cbar-row:last-child{ margin-bottom:0; }
+  .cbar-head{ display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; }
+  .cbar-head b{ font-weight:700; }
+  .cbar-head span{ color:var(--ink2); }
+  .cbar-track{ height:8px; border-radius:99px; background:var(--line); overflow:hidden; }
+  .cbar-fill{ height:100%; border-radius:99px; }
+  .panel-empty{ font-size:12px; color:var(--ink3); padding:14px 0; text-align:center; }
+
+  .sectionhead{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .sectionhead h3{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:14px; margin:0; }
+  .sectionhead .count{ font-size:12px; color:var(--ink2); }
+
+  .filterbar{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .filterbar input, .filterbar select{
+    border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font-size:12.5px; background:var(--surface); color:var(--ink);
+  }
+  .filterbar input[type=search]{ flex:1; min-width:120px; }
+  @media (max-width:640px){
+    .filterbar{ flex-wrap:wrap; }
+    .filterbar input[type=search]{ flex:1 1 100%; }
+    .filterbar select{ flex:1 1 calc(50% - 4px); min-width:0; }
+  }
+
+  .daygroup{ margin-bottom:22px; }
+  .daygroup-head{ display:flex; justify-content:space-between; align-items:baseline; padding:6px 4px; border-bottom:1.5px solid var(--line2); margin-bottom:2px; }
+  .daygroup-head .dtitle{ font-weight:700; font-size:13px; }
+  .daygroup-head .dtitle .ddate{ font-weight:500; color:var(--ink2); font-size:11.5px; margin-left:6px; }
+  .daygroup-head .dtotal{ font-size:12.5px; font-weight:700; color:var(--ink2); }
+
+  .erow{ display:grid; grid-template-columns:38px 60px 1fr auto 40px; gap:6px; align-items:center; padding:10px 4px; border-bottom:1px solid var(--line); }
+  .erow.headrow{ padding-top:0; padding-bottom:7px; border-bottom:1.5px solid var(--line2); grid-template-columns:38px 60px 1fr auto 40px; }
+  .erow.headrow span{ font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink2); }
+  .erow .date{ font-size:11px; color:var(--ink2); white-space:nowrap; }
+  .erow .cat{
+    font-size:9.5px; font-weight:700; border-radius:999px; padding:2px 7px; width:fit-content; white-space:nowrap;
+    color:var(--tagc, var(--ink2)); border:1px solid var(--tagc, var(--line2));
+  }
+  .erow .item{ font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .erow .item .country{ font-weight:500; color:var(--ink2); font-size:10.5px; margin-left:4px; }
+  .erow .amt{ font-weight:700; font-size:12.5px; white-space:nowrap; }
+  .erow .amt .fx{ display:block; font-weight:500; color:var(--ink3); font-size:9.5px; }
+  .erow .rowbtns{ display:flex; gap:2px; justify-content:flex-end; }
+  .miniicon{ background:none; border:none; color:var(--ink2); font-size:12px; padding:2px 3px; border-radius:6px; }
+  .miniicon:hover{ color:var(--ink); background:var(--line); }
+  .erow .memo{ grid-column:3/-1; font-size:11px; color:var(--ink2); margin-top:2px; }
+  .erow .receipt-thumb{ grid-column:3/-1; margin-top:4px; }
+  .receipt-thumb img{ height:44px; border-radius:6px; border:1px solid var(--line2); cursor:pointer; }
+
+  .erow.editmode{ grid-template-columns:1fr; gap:6px; padding:12px 4px; }
+  .erow.editmode input, .erow.editmode select{
+    width:100%; border:1px solid var(--line2); border-radius:7px; padding:6px 8px; font-size:12.5px; background:var(--bg); color:var(--ink);
+  }
+  .erow.editmode .rowbtns{ justify-content:flex-start; margin-top:4px; }
+
+  .empty{ text-align:center; padding:34px 10px; color:var(--ink2); font-size:13px; }
+
+  /* ---------- 문자 붙여넣기 ---------- */
+  .smspaste{ margin-top:4px; margin-bottom:14px; }
+  .smspaste textarea{
+    width:100%; resize:vertical; min-height:38px; max-height:120px;
+    border:1px dashed var(--ink3); border-radius:10px; padding:9px 12px; font-size:12.5px;
+    background:var(--surface); color:var(--ink); line-height:1.5;
+  }
+  .smspaste textarea:focus{ outline:2px solid var(--accent); outline-offset:1px; border-style:solid; }
+  .smspaste-note{ display:block; font-size:11.5px; color:var(--good); margin-top:5px; min-height:14px; }
+  .smspaste-note.warn{ color:var(--warn); }
+
+  /* ---------- 지출 추가 ---------- */
+  .addrow{ margin-bottom:10px; }
+  .addrow-card{
+    background:var(--surface); border:1px solid var(--line2); border-radius:14px;
+    padding:14px 14px 12px; box-shadow:var(--shadow);
+  }
+  .addrow-grid1{ display:grid; grid-template-columns:120px 100px 100px 1fr; gap:8px; margin-bottom:8px; }
+  .addrow-grid2{ display:grid; grid-template-columns:90px 90px 1fr 120px auto; gap:8px; align-items:center; }
+  .addrow-card input, .addrow-card select{
+    border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink); width:100%;
+  }
+  .addrow-card input:focus, .addrow-card select:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .addrow-card .fxrow{ display:none; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  .addrow-card .fxrow.show{ display:grid; }
+  .addrow-card .fxrow .fxnote{ grid-column:1/-1; font-size:10.5px; color:var(--ink3); }
+  .addrow-card button.addbtn{
+    background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:9px 14px; font-size:12.5px; font-weight:700; white-space:nowrap;
+  }
+  .addrow-card .memorow{ display:flex; gap:8px; margin-top:8px; }
+  .addrow-card .memorow input{ flex:1; }
+  .receiptbtn{
+    border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
+    padding:8px 10px; font-size:12px; font-weight:600; white-space:nowrap; flex-shrink:0;
+  }
+  .receiptbtn.has-photo{ border-color:var(--good); color:var(--good); }
+  @media (max-width:640px){
+    .addrow-grid1{ grid-template-columns:1fr 1fr; }
+    .addrow-grid2{ grid-template-columns:1fr 1fr; }
+    .addrow-grid2 button.addbtn{ grid-column:1/-1; justify-content:center; }
+  }
+
+  .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 34px; }
+  .toolbtn{
+    background:var(--surface); border:1px solid var(--line2); color:var(--ink); border-radius:9px;
+    padding:8px 14px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px;
+  }
+  .toolbtn:hover{ border-color:var(--ink3); }
+
+  /* ---------- drawer ---------- */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:100; }
+  .overlay.show{ display:block; }
+  .drawer{
+    position:fixed; top:0; right:0; height:100%; width:min(400px,92vw);
+    background:var(--bg); color:var(--ink); z-index:101; box-shadow:var(--shadow);
+    transform:translateX(100%); transition:transform .25s ease; overflow-y:auto;
+  }
+  .drawer.show{ transform:translateX(0); }
+  .drawer-inner{ padding:24px 22px 40px; }
+  .drawer h2{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:16px; margin:0 0 20px; }
+  .drawer .closebtn{ float:right; background:none; border:none; font-size:18px; color:var(--ink2); }
+  .drawer .block{ margin-bottom:26px; }
+  .drawer .block h4{ font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink2); margin:0 0 10px; }
+  .chiprow{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 10px; font-size:12.5px; font-weight:600;
+    background:var(--surface); border:1px solid var(--tagc, var(--line2)); color:var(--tagc, var(--ink));
+  }
+  .chip button{ background:none; border:none; color:var(--ink2); font-size:13px; }
+  .chip button:hover{ color:var(--warn); }
+  .drawer .addchip{ display:flex; gap:8px; }
+  .drawer .addchip input{ flex:1; border:1px solid var(--line2); border-radius:8px; padding:7px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); }
+  .drawer .addchip button{ background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; }
+  .drawer .fieldrow{ margin-bottom:10px; }
+  .drawer label{ display:block; font-size:12px; color:var(--ink2); margin-bottom:5px; }
+  .drawer input[type=text], .drawer input[type=number], .drawer input[type=date]{
+    width:100%; border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font-size:12.5px; background:var(--bg); color:var(--ink);
+  }
+  .drawer .daterow{ display:flex; gap:8px; align-items:center; }
+  .drawer .syncbtns{ display:flex; gap:8px; margin-top:10px; }
+  .drawer .syncbtns button{ flex:1; border-radius:8px; border:1px solid var(--line2); background:var(--surface); color:var(--ink); padding:8px; font-size:12px; font-weight:700; }
+  .drawer .syncbtns button.primary{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .drawer .syncbtns button.warn-btn{ border-color:var(--warn); color:var(--warn); }
+  .drawer .note{ font-size:11.5px; color:var(--ink3); line-height:1.6; }
+  .storagebar{ height:6px; border-radius:99px; background:var(--line); overflow:hidden; margin-top:8px; }
+  .storagebar-fill{ height:100%; background:var(--accent); }
+  .triplist{ display:flex; flex-direction:column; gap:8px; }
+  .tripitem{ display:flex; justify-content:space-between; align-items:center; border:1px solid var(--line2); border-radius:10px; padding:9px 11px; font-size:12.5px; }
+  .tripitem.current{ border-color:var(--accent); }
+  .tripitem .tname{ font-weight:700; }
+  .tripitem .trange{ color:var(--ink2); font-size:11px; }
+  .tripitem button{ background:none; border:none; color:var(--ink2); font-size:12px; }
+  .tripitem button:hover{ color:var(--warn); }
+
+  .toast{
+    position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:10px; font-size:13px; font-weight:600;
+    opacity:0; transition:all .25s ease; z-index:200; pointer-events:none; box-shadow:var(--shadow);
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  .modal{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(.97);
+    width:min(420px,92vw); max-height:85vh; overflow-y:auto;
+    background:var(--bg); color:var(--ink); border-radius:16px; box-shadow:var(--shadow);
+    z-index:102; padding:20px; display:none; opacity:0; transition:opacity .18s ease, transform .18s ease;
+  }
+  .modal.show{ display:block; opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .modal img{ width:100%; border-radius:10px; display:block; margin-bottom:10px; }
+  .modal .closebtn{ float:right; background:none; border:none; font-size:18px; color:var(--ink2); }
+
+  /* ---------- 정산 리포트 (인쇄) ---------- */
+  #reportView{ display:none; }
+  @media print{
+    body *{ visibility:hidden; }
+    #reportView, #reportView *{ visibility:visible; }
+    #reportView{ display:block !important; position:absolute; top:0; left:0; width:100%; padding:20px; }
+    .no-print{ display:none !important; }
+  }
+  .report-title{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:20px; margin-bottom:4px; }
+  .report-sub{ color:#555; font-size:13px; margin-bottom:20px; }
+  .report-kpis{ display:flex; gap:16px; margin-bottom:24px; }
+  .report-kpi{ border:1px solid #ccc; border-radius:10px; padding:12px 16px; flex:1; }
+  .report-kpi .l{ font-size:11px; color:#666; text-transform:uppercase; margin-bottom:4px; }
+  .report-kpi .v{ font-size:18px; font-weight:700; }
+  .report-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .report-table th, .report-table td{ border-bottom:1px solid #ddd; padding:6px 8px; text-align:left; }
+  .report-table th{ font-size:10.5px; text-transform:uppercase; color:#666; }
+  .report-table td.num{ text-align:right; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-top">
+      <div>
+        <div class="triprow">
+          <button class="navbtn" id="prevTrip">‹</button>
+          <select class="trippick" id="tripPick"></select>
+          <button class="navbtn" id="nextTrip">›</button>
+        </div>
+        <div class="trip-daterange" id="tripDateRange"></div>
+      </div>
+      <div class="iconrow">
+        <button class="iconbtn" id="installBtn">⬇ 앱 설치</button>
+        <button class="iconbtn" id="themeToggle">🌓 다크모드</button>
+        <button class="iconbtn" id="settingsToggle">⚙ 설정</button>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="hstat editable" id="budgetCard">
+        <div class="l">여행 예산 (클릭해서 수정)</div>
+        <div class="v tabular" id="budgetView">0원</div>
+      </div>
+      <div class="hstat"><div class="l">총 지출</div><div class="v tabular" id="spentView">0원</div></div>
+      <div class="hstat"><div class="l">잔여</div><div class="v tabular accent" id="remainView">0원</div></div>
+      <div class="hstat"><div class="l">건수 · 일차</div><div class="v tabular" id="countView">0건</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="body">
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-title">카테고리별 비중</div>
+        <div id="categoryPanel"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">국가별 지출 비교</div>
+        <div id="countryPanel"></div>
+      </div>
+    </div>
+
+    <div class="sectionhead">
+      <h3>지출 내역</h3>
+      <span class="count" id="tripLabel"></span>
+    </div>
+
+    <div class="filterbar">
+      <input type="search" id="searchInput" placeholder="🔍 항목 검색">
+      <select id="filterCategory"><option value="">전체 카테고리</option></select>
+      <select id="filterCountry"><option value="">전체 국가</option></select>
+      <select id="sortOrder">
+        <option value="date_asc">날짜 오래된순</option>
+        <option value="date_desc">날짜 최신순</option>
+        <option value="amount_desc">금액 높은순</option>
+        <option value="amount_asc">금액 낮은순</option>
+      </select>
+    </div>
+
+    <div id="dayGroups"></div>
+    <div id="emptyState" class="empty" style="display:none;">아직 지출 내역이 없습니다. 아래에서 추가해보세요.</div>
+
+    <div class="smspaste">
+      <textarea id="smsPasteInput" rows="1" placeholder="📩 카드 승인 문자를 여기에 붙여넣으면 아래 입력칸에 자동으로 채워집니다 (해외승인 문자도 인식 시도)"></textarea>
+      <span class="smspaste-note" id="smsPasteNote"></span>
+    </div>
+
+    <div class="addrow">
+      <div class="addrow-card">
+        <div class="addrow-grid1">
+          <input type="date" id="newDate">
+          <select id="newCategory"></select>
+          <select id="newCountry"></select>
+          <input type="text" id="newCity" placeholder="도시 (선택)">
+        </div>
+        <div class="addrow-grid2">
+          <select id="newCurrency"></select>
+          <input type="number" id="newAmount" placeholder="금액" min="0" step="1">
+          <input type="text" id="newItem" placeholder="지출 항목" list="itemSuggestions">
+          <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
+          <button type="button" class="receiptbtn" id="newReceiptBtn">📷 영수증</button>
+        </div>
+        <div class="fxrow" id="fxRow">
+          <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
+          <div class="tabular" id="fxPreview" style="font-size:12.5px; color:var(--ink2); align-self:center;"></div>
+          <div class="fxnote">해외통화 선택 시 그날 실제 적용된 환율을 입력해주세요. 마지막 입력값을 기억해둡니다.</div>
+        </div>
+        <div class="memorow">
+          <input type="text" id="newMemo" placeholder="메모 (선택)">
+          <button type="button" class="addbtn" id="addExpenseBtn">+ 추가</button>
+        </div>
+      </div>
+    </div>
+    <datalist id="itemSuggestions"></datalist>
+
+    <div class="toolbar">
+      <button class="toolbtn" id="exportBtn">⬇ 내보내기 (백업 파일)</button>
+      <button class="toolbtn" id="importBtn">⬆ 가져오기 (복원)</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+      <button class="toolbtn" id="csvExportBtn">📄 CSV 내보내기</button>
+      <button class="toolbtn" id="reportBtn">🧾 정산 리포트</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-inner">
+    <button class="closebtn" id="drawerClose">✕</button>
+    <h2>설정</h2>
+
+    <div class="block">
+      <h4>여행(트립) 관리</h4>
+      <div class="triplist" id="tripList"></div>
+      <div class="fieldrow" style="margin-top:14px;">
+        <label>새 여행 이름</label>
+        <input type="text" id="newTripName" placeholder="예: 영국·스페인 여행">
+      </div>
+      <button class="toolbtn" id="addTripBtn" style="width:100%; justify-content:center;">+ 새 여행 추가</button>
+    </div>
+
+    <div class="block">
+      <h4>현재 여행 설정</h4>
+      <div class="fieldrow">
+        <label>여행 이름</label>
+        <input type="text" id="tripNameInput">
+      </div>
+      <div class="fieldrow">
+        <label>여행 기간</label>
+        <div class="daterow">
+          <input type="date" id="tripStartInput">
+          <span>~</span>
+          <input type="date" id="tripEndInput">
+        </div>
+      </div>
+      <div class="fieldrow">
+        <label>여행 예산 (원)</label>
+        <input type="number" id="tripBudgetInput" min="0" step="10000">
+      </div>
+      <button class="toolbtn" id="saveTripBtn" style="width:100%; justify-content:center;">현재 여행 정보 저장</button>
+    </div>
+
+    <div class="block">
+      <h4>카테고리 관리</h4>
+      <div class="chiprow" id="categoryChips"></div>
+      <div class="addchip">
+        <input type="text" id="newCategoryInput" placeholder="새 카테고리 (예: 쇼핑)">
+        <button id="addCategoryBtn">추가</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <h4>국가 관리</h4>
+      <div class="chiprow" id="countryChips"></div>
+      <div class="addchip">
+        <input type="text" id="newCountryInput" placeholder="새 국가 (예: 프랑스)">
+        <button id="addCountryBtn">추가</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <h4>통화 관리</h4>
+      <div class="chiprow" id="currencyChips"></div>
+      <div class="addchip">
+        <input type="text" id="newCurrencyInput" placeholder="새 통화 코드 (예: USD)">
+        <button id="addCurrencyBtn">추가</button>
+      </div>
+      <p class="note" style="margin-top:8px;">KRW는 원화 그대로, 그 외 통화는 지출 추가 시 환율을 입력하면 자동으로 원화 환산됩니다.</p>
+    </div>
+
+    <div class="block">
+      <h4>저장공간 사용량</h4>
+      <div class="storagebar"><div class="storagebar-fill" id="storageBarFill" style="width:0%;"></div></div>
+      <p class="note" id="storageNote" style="margin-top:6px;"></p>
+      <p class="note">영수증 사진은 브라우저 저장공간(localStorage)에 압축되어 저장됩니다. 사진이 많아지면 공간이 부족해질 수 있으니, 아래 "내보내기"로 주기적으로 백업해두는 것을 권장합니다.</p>
+    </div>
+
+    <div class="block">
+      <h4>데이터 백업 / 복원 (파일)</h4>
+      <p class="note">브라우저 저장공간이 초기화되어도 데이터를 잃지 않도록, 주기적으로 내보내기 파일을 보관해두는 것을 권장합니다.</p>
+      <div class="syncbtns">
+        <button id="drawerExportBtn">⬇ 내보내기</button>
+        <button id="drawerImportBtn">⬆ 가져오기</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <h4>여행 삭제</h4>
+      <p class="note">현재 선택된 여행과 그 안의 모든 지출 내역이 삭제됩니다. 되돌릴 수 없으니 먼저 내보내기로 백업해두세요.</p>
+      <button class="toolbtn warn-btn" id="deleteTripBtn" style="width:100%; justify-content:center; border-color:var(--warn); color:var(--warn);">이 여행 삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="photoOverlay"></div>
+<div class="modal" id="photoModal">
+  <button class="closebtn" id="photoClose">✕</button>
+  <img id="photoModalImg" src="" alt="영수증">
+</div>
+
+<div id="reportView">
+  <div class="report-title" id="reportTripName"></div>
+  <div class="report-sub" id="reportTripRange"></div>
+  <div class="report-kpis">
+    <div class="report-kpi"><div class="l">총 지출</div><div class="v" id="reportTotal"></div></div>
+    <div class="report-kpi"><div class="l">일 평균</div><div class="v" id="reportAvg"></div></div>
+    <div class="report-kpi"><div class="l">건수</div><div class="v" id="reportCount"></div></div>
+  </div>
+  <table class="report-table">
+    <thead><tr><th>날짜</th><th>카테고리</th><th>국가</th><th>항목</th><th style="text-align:right;">금액(원)</th></tr></thead>
+    <tbody id="reportRows"></tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  const STORAGE_KEY = "travel_budget_app_v1";
+  const THEME_KEY = "travel_budget_theme_v1";
+
+  const DEFAULT_CATEGORIES = ["식사","숙소","교통","기타"];
+  const DEFAULT_COUNTRIES = ["영국","스페인"];
+  const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
+
+  const TAG_COLOR_PALETTE = ["#C1440E","#2F6FE0","#1F8A6B","#9B5CF0","#B08900","#5B7A99","#C1447A"];
+  function tagColor(list, name){
+    const idx = list.indexOf(name);
+    return TAG_COLOR_PALETTE[(idx >= 0 ? idx : 0) % TAG_COLOR_PALETTE.length];
+  }
+
+  function uid(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+  }
+
+  function seedData(){
+    const tripId = uid();
+    return {
+      categories: DEFAULT_CATEGORIES.slice(),
+      countries: DEFAULT_COUNTRIES.slice(),
+      currencies: DEFAULT_CURRENCIES.slice(),
+      trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "", budget: 0 }],
+      currentTripId: tripId,
+      expenses: [],
+      lastFxRate: {}
+    };
+  }
+
+  function normalizeData(d){
+    if(!d.categories || !d.categories.length) d.categories = DEFAULT_CATEGORIES.slice();
+    if(!d.countries || !d.countries.length) d.countries = DEFAULT_COUNTRIES.slice();
+    if(!d.currencies || !d.currencies.length) d.currencies = DEFAULT_CURRENCIES.slice();
+    if(!d.trips || !d.trips.length){
+      const tripId = uid();
+      d.trips = [{ id: tripId, name: "새 여행", startDate: "", endDate: "", budget: 0 }];
+      d.currentTripId = tripId;
+    }
+    if(!d.currentTripId || !d.trips.find(t => t.id === d.currentTripId)) d.currentTripId = d.trips[0].id;
+    if(!d.expenses) d.expenses = [];
+    if(!d.lastFxRate) d.lastFxRate = {};
+    return d;
+  }
+
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(parsed && parsed.trips && parsed.expenses){
+          return normalizeData(parsed);
+        }
+      }
+    }catch(e){ console.warn("load failed", e); }
+    const seed = seedData();
+    saveData(seed);
+    return seed;
+  }
+
+  function saveData(d){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+    catch(e){
+      console.warn("save failed", e);
+      showToast("저장 실패: 브라우저 저장공간이 가득 찼을 수 있어요. 오래된 영수증 사진을 정리해주세요.");
+    }
+  }
+
+  let data = loadData();
+
+  function currentTrip(){ return data.trips.find(t => t.id === data.currentTripId) || data.trips[0]; }
+  function tripExpenses(tripId){ return data.expenses.filter(e => e.tripId === tripId).sort((a,b)=> a.date.localeCompare(b.date)); }
+
+  function won(n){ return Math.round(n).toLocaleString('ko-KR') + '원'; }
+  function todayStr(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+
+  const el = id => document.getElementById(id);
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- 이미지 압축 (영수증 사진) ----------
+  function compressImage(file, maxW){
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, maxW / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.onerror = () => resolve(null);
+        img.src = reader.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  let pendingReceiptDataUrl = null;
+  el('newReceiptBtn').addEventListener('click', () => el('newReceiptFile').click());
+  el('newReceiptFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    pendingReceiptDataUrl = await compressImage(file, 900);
+    el('newReceiptBtn').textContent = pendingReceiptDataUrl ? '📷 첨부됨' : '📷 영수증';
+    el('newReceiptBtn').classList.toggle('has-photo', !!pendingReceiptDataUrl);
+  });
+
+  // ---------- 통화/환율 ----------
+  function renderCurrencyOptions(){
+    const sel = el('newCurrency');
+    const prev = sel.value;
+    sel.innerHTML = data.currencies.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = data.currencies.includes(prev) ? prev : 'KRW';
+    toggleFxRow();
+  }
+  function toggleFxRow(){
+    const cur = el('newCurrency').value;
+    const isForeign = cur && cur !== 'KRW';
+    el('fxRow').classList.toggle('show', isForeign);
+    if(isForeign && data.lastFxRate[cur]) el('newFxRate').value = data.lastFxRate[cur];
+    updateFxPreview();
+  }
+  function updateFxPreview(){
+    const cur = el('newCurrency').value;
+    const amt = Number(el('newAmount').value) || 0;
+    const rate = Number(el('newFxRate').value) || 0;
+    if(cur !== 'KRW' && amt && rate){
+      el('fxPreview').textContent = '≈ ' + won(amt * rate);
+    } else {
+      el('fxPreview').textContent = '';
+    }
+  }
+  el('newCurrency').addEventListener('change', toggleFxRow);
+  el('newAmount').addEventListener('input', updateFxPreview);
+  el('newFxRate').addEventListener('input', updateFxPreview);
+
+  function computeKrw(currency, amount, fxRate){
+    if(currency === 'KRW') return Math.round(amount);
+    return Math.round(amount * (fxRate || 0));
+  }
+
+  // ---------- 카테고리/국가 옵션 ----------
+  function renderCategoryOptions(){
+    const sel = el('newCategory');
+    const prev = sel.value;
+    sel.innerHTML = data.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    if(data.categories.includes(prev)) sel.value = prev;
+
+    const filterSel = el('filterCategory');
+    const prevF = filterSel.value;
+    filterSel.innerHTML = '<option value="">전체 카테고리</option>' + data.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    filterSel.value = data.categories.includes(prevF) ? prevF : '';
+  }
+  function renderCountryOptions(){
+    const sel = el('newCountry');
+    const prev = sel.value;
+    sel.innerHTML = data.countries.map(c => `<option value="${c}">${c}</option>`).join('');
+    if(data.countries.includes(prev)) sel.value = prev;
+
+    const filterSel = el('filterCountry');
+    const prevF = filterSel.value;
+    filterSel.innerHTML = '<option value="">전체 국가</option>' + data.countries.map(c => `<option value="${c}">${c}</option>`).join('');
+    filterSel.value = data.countries.includes(prevF) ? prevF : '';
+  }
+
+  function renderChips(){
+    const usedCats = new Set(data.expenses.map(e=>e.category));
+    el('categoryChips').innerHTML = data.categories.map(c => {
+      const inUse = usedCats.has(c);
+      const color = tagColor(data.categories, c);
+      return `<span class="chip" style="--tagc:${color};">${escapeHtml(c)}${inUse ? '' : ` <button data-remove-cat="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
+    }).join('');
+
+    const usedCountries = new Set(data.expenses.map(e=>e.country));
+    el('countryChips').innerHTML = data.countries.map(c => {
+      const inUse = usedCountries.has(c);
+      return `<span class="chip">${escapeHtml(c)}${inUse ? '' : ` <button data-remove-country="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
+    }).join('');
+
+    const usedCurrencies = new Set(data.expenses.map(e=>e.currency));
+    el('currencyChips').innerHTML = data.currencies.map(c => {
+      const inUse = usedCurrencies.has(c) || c === 'KRW';
+      return `<span class="chip">${escapeHtml(c)}${inUse ? '' : ` <button data-remove-currency="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
+    }).join('');
+  }
+
+  function renderItemSuggestions(){
+    const seen = new Set();
+    const items = [];
+    data.expenses.slice().sort((a,b)=> b.date.localeCompare(a.date)).forEach(e => {
+      if(!seen.has(e.item)){ seen.add(e.item); items.push(e.item); }
+    });
+    el('itemSuggestions').innerHTML = items.slice(0,25).map(i => `<option value="${escapeHtml(i)}">`).join('');
+  }
+
+  // ---------- 필터/정렬 ----------
+  let searchTerm = '';
+  let filterCategory = '';
+  let filterCountry = '';
+  let sortOrder = 'date_asc';
+
+  function filteredExpenses(){
+    let list = tripExpenses(data.currentTripId);
+    if(filterCategory) list = list.filter(e => e.category === filterCategory);
+    if(filterCountry) list = list.filter(e => e.country === filterCountry);
+    if(searchTerm){
+      const s = searchTerm.toLowerCase();
+      list = list.filter(e => e.item.toLowerCase().includes(s) || (e.memo||'').toLowerCase().includes(s));
+    }
+    list = list.slice();
+    if(sortOrder === 'date_asc') list.sort((a,b)=> a.date.localeCompare(b.date));
+    else if(sortOrder === 'date_desc') list.sort((a,b)=> b.date.localeCompare(a.date));
+    else if(sortOrder === 'amount_desc') list.sort((a,b)=> b.amountKrw - a.amountKrw);
+    else if(sortOrder === 'amount_asc') list.sort((a,b)=> a.amountKrw - b.amountKrw);
+    return list;
+  }
+
+  // ---------- 렌더: 카테고리 도넛 ----------
+  function renderCategoryPanel(){
+    const list = tripExpenses(data.currentTripId);
+    const totals = {};
+    list.forEach(e => { totals[e.category] = (totals[e.category]||0) + e.amountKrw; });
+    const entries = Object.keys(totals).map(k => ({name:k, amt:totals[k]})).sort((a,b)=> b.amt - a.amt);
+    const panel = el('categoryPanel');
+    if(!entries.length){ panel.innerHTML = '<div class="panel-empty">아직 지출 내역이 없습니다</div>'; return; }
+    const total = entries.reduce((s,e)=>s+e.amt,0);
+    let acc = 0;
+    const stops = entries.map(e => {
+      const color = tagColor(data.categories, e.name);
+      const start = (acc/total*100);
+      acc += e.amt;
+      const end = (acc/total*100);
+      return `${color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+    }).join(', ');
+    const legend = entries.map(e => {
+      const color = tagColor(data.categories, e.name);
+      const pct = (e.amt/total*100).toFixed(1);
+      return `<div class="legend-row"><span class="legend-dot" style="background:${color};"></span><span class="legend-name">${escapeHtml(e.name)}</span><span class="legend-pct tabular">${pct}%</span></div>`;
+    }).join('');
+    panel.innerHTML = `
+      <div class="donut-row">
+        <div class="donut" style="background:conic-gradient(${stops});"></div>
+        <div class="legend">${legend}</div>
+      </div>`;
+  }
+
+  // ---------- 렌더: 국가 비교 ----------
+  function renderCountryPanel(){
+    const list = tripExpenses(data.currentTripId);
+    const totals = {};
+    list.forEach(e => { totals[e.country] = (totals[e.country]||0) + e.amountKrw; });
+    const entries = Object.keys(totals).map(k => ({name:k, amt:totals[k]})).sort((a,b)=> b.amt - a.amt);
+    const panel = el('countryPanel');
+    if(!entries.length){ panel.innerHTML = '<div class="panel-empty">아직 지출 내역이 없습니다</div>'; return; }
+    const max = entries[0].amt;
+    panel.innerHTML = entries.map(e => {
+      const color = tagColor(data.countries, e.name);
+      return `<div class="cbar-row">
+        <div class="cbar-head"><b>${escapeHtml(e.name)}</b><span class="tabular">${won(e.amt)}</span></div>
+        <div class="cbar-track"><div class="cbar-fill" style="width:${(e.amt/max*100).toFixed(1)}%; background:${color};"></div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- 일자 라벨 ----------
+  function dayInfo(trip, dateStr){
+    if(!trip.startDate) return { label: dateStr, isNumbered:false };
+    const start = new Date(trip.startDate + 'T00:00:00');
+    const cur = new Date(dateStr + 'T00:00:00');
+    const dayNum = Math.round((cur - start) / 86400000) + 1;
+    return { label: `Day ${dayNum}`, isNumbered:true };
+  }
+
+  function rowHtml(e){
+    const catColor = tagColor(data.categories, e.category);
+    const fxHtml = e.currency !== 'KRW' ? `<span class="fx">${Number(e.amountForeign).toLocaleString('ko-KR')} ${e.currency}</span>` : '';
+    const memoHtml = e.memo ? `<div class="memo">📝 ${escapeHtml(e.memo)}</div>` : '';
+    const photoHtml = e.receipt ? `<div class="receipt-thumb"><img src="${e.receipt}" data-photo="${e.id}" alt="영수증"></div>` : '';
+    return `<div class="erow" data-id="${e.id}">
+      <div class="date">${e.date.slice(5).replace('-','.')}</div>
+      <div class="cat" style="--tagc:${catColor};">${escapeHtml(e.category)}</div>
+      <div class="item">${escapeHtml(e.item)}<span class="country">${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span></div>
+      <div class="amt tabular">${won(e.amountKrw)}${fxHtml}</div>
+      <div class="rowbtns">
+        <button class="miniicon" data-edit="${e.id}" title="수정">✎</button>
+        <button class="miniicon" data-del="${e.id}" title="삭제">🗑</button>
+      </div>
+      ${memoHtml}
+      ${photoHtml}
+    </div>`;
+  }
+
+  function renderDayGroups(){
+    const trip = currentTrip();
+    const list = filteredExpenses();
+    const fullList = tripExpenses(data.currentTripId);
+    if(!fullList.length){
+      el('emptyState').style.display = 'block';
+      el('emptyState').textContent = '아직 지출 내역이 없습니다. 아래에서 추가해보세요.';
+      el('dayGroups').innerHTML = '';
+      return;
+    }
+    if(!list.length){
+      el('emptyState').style.display = 'block';
+      el('emptyState').textContent = '검색/필터 조건에 맞는 내역이 없습니다.';
+      el('dayGroups').innerHTML = '';
+      return;
+    }
+    el('emptyState').style.display = 'none';
+
+    const groups = {};
+    const order = [];
+    list.forEach(e => {
+      if(!groups[e.date]){ groups[e.date] = []; order.push(e.date); }
+      groups[e.date].push(e);
+    });
+    if(sortOrder === 'date_desc') order.reverse();
+
+    el('dayGroups').innerHTML = order.map(dateStr => {
+      const items = groups[dateStr];
+      const dayTotal = items.reduce((s,e)=>s+e.amountKrw,0);
+      const info = dayInfo(trip, dateStr);
+      const dateLabel = info.isNumbered ? `${info.label}<span class="ddate">${dateStr.slice(5).replace('-','.')}</span>` : dateStr;
+      return `<div class="daygroup">
+        <div class="daygroup-head"><span class="dtitle">${dateLabel}</span><span class="dtotal tabular">${won(dayTotal)}</span></div>
+        ${items.map(rowHtml).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- 저장공간 사용량 ----------
+  function renderStorageUsage(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY) || '';
+      const bytes = new Blob([raw]).size;
+      const mb = bytes / (1024*1024);
+      const limitMb = 5; // 대략적인 브라우저 localStorage 한도 추정치
+      const pct = Math.min(100, (mb/limitMb*100));
+      el('storageBarFill').style.width = pct.toFixed(1) + '%';
+      el('storageNote').textContent = `약 ${mb.toFixed(2)}MB 사용 중 (브라우저별로 한도가 달라 참고용입니다)`;
+    }catch(e){}
+  }
+
+  // ---------- 트립 관리 ----------
+  function renderTripPicker(){
+    const sel = el('tripPick');
+    sel.innerHTML = data.trips.map(t => `<option value="${t.id}" ${t.id===data.currentTripId?'selected':''}>${escapeHtml(t.name)}</option>`).join('');
+    const idx = data.trips.findIndex(t => t.id === data.currentTripId);
+    el('prevTrip').disabled = idx <= 0;
+    el('nextTrip').disabled = idx >= data.trips.length - 1;
+    const trip = currentTrip();
+    el('tripDateRange').textContent = (trip.startDate && trip.endDate) ? `${trip.startDate} ~ ${trip.endDate}` : '여행 기간 미설정 (설정에서 입력)';
+  }
+
+  function renderTripList(){
+    el('tripList').innerHTML = data.trips.map(t => {
+      const range = (t.startDate && t.endDate) ? `${t.startDate} ~ ${t.endDate}` : '기간 미설정';
+      return `<div class="tripitem ${t.id===data.currentTripId?'current':''}" data-select-trip="${t.id}">
+        <div><div class="tname">${escapeHtml(t.name)}</div><div class="trange">${range}</div></div>
+        <button data-goto-trip="${t.id}">이동</button>
+      </div>`;
+    }).join('');
+  }
+
+  // ---------- 마스터 렌더 ----------
+  function render(){
+    renderTripPicker();
+    renderTripList();
+    renderCategoryOptions();
+    renderCountryOptions();
+    renderCurrencyOptions();
+    renderChips();
+    renderItemSuggestions();
+    renderStorageUsage();
+
+    const trip = currentTrip();
+    const list = tripExpenses(trip.id);
+    const spent = list.reduce((s,e)=>s+e.amountKrw,0);
+    const budget = Number(trip.budget) || 0;
+    const remain = budget - spent;
+
+    let dayCount = '';
+    if(trip.startDate && trip.endDate){
+      const s = new Date(trip.startDate+'T00:00:00'), e2 = new Date(trip.endDate+'T00:00:00');
+      const total = Math.round((e2-s)/86400000) + 1;
+      dayCount = ` · ${total}일 여행`;
+    }
+    el('tripLabel').textContent = `${trip.name} · ${list.length}건${dayCount}`;
+    el('budgetView').textContent = won(budget);
+    el('spentView').textContent = won(spent);
+    el('remainView').textContent = won(remain);
+    el('countView').textContent = list.length + '건';
+
+    el('newDate').value = (trip.startDate && todayStr() < trip.startDate) ? trip.startDate : (trip.startDate && todayStr() > trip.endDate ? trip.endDate : todayStr());
+
+    el('tripNameInput').value = trip.name;
+    el('tripStartInput').value = trip.startDate || '';
+    el('tripEndInput').value = trip.endDate || '';
+    el('tripBudgetInput').value = trip.budget || '';
+
+    renderCategoryPanel();
+    renderCountryPanel();
+    renderDayGroups();
+  }
+
+  // ---------- 토스트 ----------
+  let toastTimer;
+  function showToast(msg){
+    const t = el('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.classList.remove('show'), 2400);
+  }
+
+  // ---------- 트립 이동/추가/삭제 ----------
+  el('tripPick').addEventListener('change', e => { data.currentTripId = e.target.value; render(); });
+  el('prevTrip').addEventListener('click', () => {
+    const idx = data.trips.findIndex(t=>t.id===data.currentTripId);
+    if(idx > 0){ data.currentTripId = data.trips[idx-1].id; render(); }
+  });
+  el('nextTrip').addEventListener('click', () => {
+    const idx = data.trips.findIndex(t=>t.id===data.currentTripId);
+    if(idx < data.trips.length-1){ data.currentTripId = data.trips[idx+1].id; render(); }
+  });
+  el('tripList').addEventListener('click', e => {
+    const id = e.target.dataset.gotoTrip;
+    if(id){ data.currentTripId = id; render(); closeDrawer(); }
+  });
+  el('addTripBtn').addEventListener('click', () => {
+    const name = el('newTripName').value.trim();
+    if(!name){ showToast('여행 이름을 입력해주세요'); return; }
+    const id = uid();
+    data.trips.push({ id, name, startDate:"", endDate:"", budget:0 });
+    data.currentTripId = id;
+    saveData(data);
+    el('newTripName').value = '';
+    render();
+    showToast(`'${name}' 여행이 추가되었습니다`);
+  });
+  el('saveTripBtn').addEventListener('click', () => {
+    const trip = currentTrip();
+    trip.name = el('tripNameInput').value.trim() || trip.name;
+    trip.startDate = el('tripStartInput').value || '';
+    trip.endDate = el('tripEndInput').value || '';
+    trip.budget = Math.max(0, Number(el('tripBudgetInput').value) || 0);
+    saveData(data);
+    render();
+    showToast('여행 정보가 저장되었습니다');
+  });
+  el('deleteTripBtn').addEventListener('click', () => {
+    if(data.trips.length <= 1){ showToast('마지막 남은 여행은 삭제할 수 없습니다'); return; }
+    const trip = currentTrip();
+    if(!confirm(`'${trip.name}' 여행과 그 안의 모든 지출 내역을 삭제합니다. 계속할까요?`)) return;
+    data.expenses = data.expenses.filter(e => e.tripId !== trip.id);
+    data.trips = data.trips.filter(t => t.id !== trip.id);
+    data.currentTripId = data.trips[0].id;
+    saveData(data);
+    render();
+    showToast('여행이 삭제되었습니다');
+  });
+
+  // ---------- 예산 인라인 수정 ----------
+  el('budgetCard').addEventListener('click', () => {
+    if(el('budgetCard').querySelector('input')) return;
+    const trip = currentTrip();
+    const view = el('budgetView');
+    view.outerHTML = `<input type="number" class="editv" id="budgetView" value="${trip.budget||0}" min="0" step="10000">`;
+    const input = el('budgetView');
+    input.focus(); input.select();
+    function commit(){
+      trip.budget = Math.max(0, Number(input.value)||0);
+      saveData(data);
+      render();
+    }
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', ev => { if(ev.key==='Enter') input.blur(); });
+  });
+
+  // ---------- 필터/정렬 ----------
+  el('searchInput').addEventListener('input', e => { searchTerm = e.target.value; renderDayGroups(); });
+  el('filterCategory').addEventListener('change', e => { filterCategory = e.target.value; renderDayGroups(); });
+  el('filterCountry').addEventListener('change', e => { filterCountry = e.target.value; renderDayGroups(); });
+  el('sortOrder').addEventListener('change', e => { sortOrder = e.target.value; renderDayGroups(); });
+
+  // ---------- 카드 승인 문자 붙여넣기 자동인식 (해외승인 포함) ----------
+  function parseSmsExpense(text){
+    const t = (text || '').replace(/\s+/g, ' ').trim();
+    if(!t) return null;
+
+    // 통화코드 탐지 (해외승인: "USD 45.00" 형태 등)
+    let currency = null, foreignAmount = null;
+    const fxm = t.match(/\b(USD|EUR|GBP|JPY|CNY)\b\s*([\d,.]+)/i);
+    if(fxm){ currency = fxm[1].toUpperCase(); foreignAmount = parseFloat(fxm[2].replace(/,/g,'')); }
+
+    // 원화 금액: "원화환산 76,500원" / "(₩76,500)" 라벨을 최우선으로, 그 다음 "81,800원 일시불" 형태
+    let krwAmount = null;
+    let m = t.match(/원화\s*(?:환산)?\s*[:\s]*₩?\s*([\d,]{3,})\s*원?/);
+    if(m){ krwAmount = parseInt(m[1].replace(/,/g,''), 10); }
+    if(!krwAmount){
+      m = t.match(/₩\s*([\d,]{3,})/);
+      if(m){ krwAmount = parseInt(m[1].replace(/,/g,''), 10); }
+    }
+    if(!krwAmount){
+      m = t.match(/([\d,]{3,})\s*원\s*(?:일시불|\d+\s*개월)/);
+      if(m){ krwAmount = parseInt(m[1].replace(/,/g,''), 10); }
+    }
+    if(!krwAmount){
+      const all = [...t.matchAll(/([\d,]{3,})\s*원/g)];
+      const nonAccum = all.filter(x => !/(누적|잔액)\s*$/.test(t.slice(0, x.index)));
+      const pick = nonAccum.length ? nonAccum[0] : all[0];
+      if(pick) krwAmount = parseInt(pick[1].replace(/,/g,''), 10);
+    }
+
+    // 날짜 MM/DD
+    let date = null;
+    const dm = t.match(/(\d{1,2})\/(\d{1,2})(?:\s+\d{1,2}:\d{2})?/);
+    if(dm){
+      const mm = dm[1].padStart(2,'0'), dd = dm[2].padStart(2,'0');
+      const now = new Date();
+      let year = now.getFullYear();
+      const candidate = new Date(`${year}-${mm}-${dd}T00:00:00`);
+      if(candidate.getTime() - now.getTime() > 86400000) year -= 1;
+      date = `${year}-${mm}-${dd}`;
+    }
+
+    // 가맹점명: 시간(HH:MM) 뒤 ~ "누적"/"원화환산" 등 뒤따르는 금액 표기 앞
+    function trimTail(tail){
+      return tail
+        .split('누적')[0]
+        .split(/원화\s*(?:환산)?/)[0]
+        .replace(/\(?₩\s*[\d,]+\)?/g, '')
+        .trim();
+    }
+    let item = '';
+    const timeIdx = t.search(/\d{1,2}:\d{2}/);
+    if(timeIdx >= 0){
+      let tail = t.slice(timeIdx).replace(/^\d{1,2}:\d{2}/, '').trim();
+      item = trimTail(tail);
+    }
+    if(!item && dm){
+      let tail = t.slice(t.indexOf(dm[0]) + dm[0].length).trim();
+      item = trimTail(tail);
+    }
+
+    // 카테고리 추정: 등록된 카테고리 이름이 문자에 그대로 있으면 사용 (드묾, 보통 못 맞춤 -> 사용자가 확인)
+    let category = null;
+    for(const c of data.categories){ if(c && t.includes(c)){ category = c; break; } }
+
+    if(!krwAmount && !foreignAmount && !item) return null;
+    return { date, item, category, currency, foreignAmount, krwAmount };
+  }
+
+  function applySmsParse(){
+    const raw = el('smsPasteInput').value;
+    const note = el('smsPasteNote');
+    if(!raw.trim()){ note.textContent = ''; note.classList.remove('warn'); return; }
+    const parsed = parseSmsExpense(raw);
+    if(!parsed || (!parsed.krwAmount && !parsed.foreignAmount && !parsed.item)){
+      note.textContent = '문자에서 금액/가맹점을 못 찾았어요. 직접 입력해주세요.';
+      note.classList.add('warn');
+      return;
+    }
+    if(parsed.date) el('newDate').value = parsed.date;
+    if(parsed.item) el('newItem').value = parsed.item;
+    if(parsed.category) el('newCategory').value = parsed.category;
+
+    if(parsed.currency && data.currencies.includes(parsed.currency)){
+      el('newCurrency').value = parsed.currency;
+      toggleFxRow();
+      if(parsed.foreignAmount) el('newAmount').value = parsed.foreignAmount;
+      if(parsed.krwAmount && parsed.foreignAmount){
+        const impliedRate = parsed.krwAmount / parsed.foreignAmount;
+        el('newFxRate').value = impliedRate.toFixed(2);
+      }
+    } else if(parsed.krwAmount){
+      el('newCurrency').value = 'KRW';
+      toggleFxRow();
+      el('newAmount').value = parsed.krwAmount;
+    }
+    updateFxPreview();
+
+    const parts = [];
+    if(parsed.date) parts.push(parsed.date.slice(5).replace('-','.'));
+    if(parsed.item) parts.push(parsed.item);
+    if(parsed.foreignAmount && parsed.currency) parts.push(`${parsed.foreignAmount} ${parsed.currency}`);
+    else if(parsed.krwAmount) parts.push(won(parsed.krwAmount));
+    note.textContent = `✓ 인식됨: ${parts.join(' · ')} — 확인 후 "+ 추가"를 눌러주세요`;
+    note.classList.remove('warn');
+  }
+  let smsParseTimer = null;
+  el('smsPasteInput').addEventListener('input', () => {
+    clearTimeout(smsParseTimer);
+    smsParseTimer = setTimeout(applySmsParse, 150);
+  });
+
+  // ---------- 지출 추가 ----------
+  el('addExpenseBtn').addEventListener('click', () => {
+    const date = el('newDate').value;
+    const category = el('newCategory').value;
+    const country = el('newCountry').value;
+    const city = el('newCity').value.trim();
+    const currency = el('newCurrency').value;
+    const amount = Number(el('newAmount').value);
+    const fxRate = Number(el('newFxRate').value);
+    const item = el('newItem').value.trim();
+    const memo = el('newMemo').value.trim();
+
+    if(!date){ showToast('날짜를 선택해주세요'); return; }
+    if(!item){ showToast('지출 항목을 입력해주세요'); return; }
+    if(!amount || amount <= 0){ showToast('금액을 입력해주세요'); return; }
+    if(currency !== 'KRW' && (!fxRate || fxRate <= 0)){ showToast('환율을 입력해주세요'); return; }
+
+    const amountKrw = computeKrw(currency, amount, fxRate);
+    data.expenses.push({
+      id: uid(), tripId: data.currentTripId, date, category, country, city,
+      currency, amountForeign: currency === 'KRW' ? null : amount,
+      amountKrw, item, memo, receipt: pendingReceiptDataUrl
+    });
+    if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
+    saveData(data);
+
+    el('newItem').value=''; el('newAmount').value=''; el('newFxRate').value=''; el('newMemo').value=''; el('newCity').value='';
+    el('smsPasteInput').value=''; el('smsPasteNote').textContent=''; el('smsPasteNote').classList.remove('warn');
+    pendingReceiptDataUrl = null;
+    el('newReceiptBtn').textContent = '📷 영수증'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
+    updateFxPreview();
+    render();
+    showToast('지출 내역이 추가되었습니다');
+  });
+
+  // ---------- 수정/삭제/영수증 보기 ----------
+  el('dayGroups').addEventListener('click', e => {
+    const editId = e.target.dataset.edit;
+    const delId = e.target.dataset.del;
+    const photoId = e.target.dataset.photo;
+    if(editId) enterEditMode(editId);
+    if(delId){
+      if(confirm('이 지출 내역을 삭제할까요?')){
+        data.expenses = data.expenses.filter(x=>x.id!==delId);
+        saveData(data); render();
+        showToast('삭제되었습니다');
+      }
+    }
+    if(photoId){
+      const exp = data.expenses.find(x=>x.id===photoId);
+      if(exp && exp.receipt){ el('photoModalImg').src = exp.receipt; openPhotoModal(); }
+    }
+  });
+
+  function enterEditMode(id){
+    const exp = data.expenses.find(x=>x.id===id);
+    if(!exp) return;
+    const row = document.querySelector(`.erow[data-id="${id}"]`);
+    if(!row) return;
+    const catOptions = data.categories.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.category?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    const countryOptions = data.countries.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.country?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    row.classList.add('editmode');
+    row.innerHTML = `
+      <input type="date" value="${exp.date}" data-f="date">
+      <select data-f="category">${catOptions}</select>
+      <select data-f="country">${countryOptions}</select>
+      <input type="text" value="${escapeHtml(exp.item)}" data-f="item" placeholder="지출 항목">
+      <input type="number" value="${exp.amountKrw}" data-f="amountKrw" min="0" step="100" placeholder="원화 금액">
+      <div class="rowbtns">
+        <button class="miniicon" data-save="${id}" title="저장">✔</button>
+        <button class="miniicon" data-cancel="${id}" title="취소">✕</button>
+      </div>
+      <input type="text" value="${escapeHtml(exp.memo||'')}" data-f="memo" placeholder="메모 (선택)">`;
+    row.querySelector('[data-save]').addEventListener('click', () => {
+      const date = row.querySelector('[data-f="date"]').value;
+      const category = row.querySelector('[data-f="category"]').value;
+      const country = row.querySelector('[data-f="country"]').value;
+      const item = row.querySelector('[data-f="item"]').value.trim();
+      const amountKrw = Number(row.querySelector('[data-f="amountKrw"]').value);
+      const memo = row.querySelector('[data-f="memo"]').value.trim();
+      if(!date || !item || !amountKrw || amountKrw<=0){ showToast('입력값을 확인해주세요'); return; }
+      exp.date = date; exp.category = category; exp.country = country; exp.item = item; exp.amountKrw = amountKrw; exp.memo = memo;
+      // 원화로 직접 수정한 경우 외화 원본표기는 참고용으로 남겨두되 금액 기준은 원화로 통일
+      saveData(data);
+      render();
+      showToast('수정되었습니다');
+    });
+    row.querySelector('[data-cancel]').addEventListener('click', render);
+  }
+
+  // ---------- 영수증 모달 ----------
+  function openPhotoModal(){ el('photoModal').classList.add('show'); el('photoOverlay').classList.add('show'); }
+  function closePhotoModal(){ el('photoModal').classList.remove('show'); el('photoOverlay').classList.remove('show'); }
+  el('photoClose').addEventListener('click', closePhotoModal);
+  el('photoOverlay').addEventListener('click', closePhotoModal);
+
+  // ---------- 카테고리/국가/통화 관리 ----------
+  el('addCategoryBtn').addEventListener('click', () => {
+    const input = el('newCategoryInput');
+    const name = input.value.trim();
+    if(!name) return;
+    if(data.categories.includes(name)){ showToast('이미 있는 카테고리입니다'); return; }
+    data.categories.push(name);
+    saveData(data); input.value=''; render();
+    showToast(`'${name}' 카테고리가 추가되었습니다`);
+  });
+  el('categoryChips').addEventListener('click', e => {
+    const name = e.target.dataset.removeCat;
+    if(!name) return;
+    data.categories = data.categories.filter(c=>c!==name);
+    saveData(data); render();
+  });
+  el('addCountryBtn').addEventListener('click', () => {
+    const input = el('newCountryInput');
+    const name = input.value.trim();
+    if(!name) return;
+    if(data.countries.includes(name)){ showToast('이미 있는 국가입니다'); return; }
+    data.countries.push(name);
+    saveData(data); input.value=''; render();
+    showToast(`'${name}' 국가가 추가되었습니다`);
+  });
+  el('countryChips').addEventListener('click', e => {
+    const name = e.target.dataset.removeCountry;
+    if(!name) return;
+    data.countries = data.countries.filter(c=>c!==name);
+    saveData(data); render();
+  });
+  el('addCurrencyBtn').addEventListener('click', () => {
+    const input = el('newCurrencyInput');
+    const name = input.value.trim().toUpperCase();
+    if(!name) return;
+    if(data.currencies.includes(name)){ showToast('이미 있는 통화입니다'); return; }
+    data.currencies.push(name);
+    saveData(data); input.value=''; render();
+    showToast(`'${name}' 통화가 추가되었습니다`);
+  });
+  el('currencyChips').addEventListener('click', e => {
+    const name = e.target.dataset.removeCurrency;
+    if(!name || name === 'KRW') return;
+    data.currencies = data.currencies.filter(c=>c!==name);
+    saveData(data); render();
+  });
+  [['newCategoryInput','addCategoryBtn'], ['newCountryInput','addCountryBtn'], ['newCurrencyInput','addCurrencyBtn']].forEach(([inputId, btnId]) => {
+    el(inputId).addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); el(btnId).click(); } });
+  });
+
+  // ---------- 테마 ----------
+  function applyTheme(t){
+    if(t === 'dark' || t === 'light'){ document.documentElement.setAttribute('data-theme', t); }
+    else { document.documentElement.removeAttribute('data-theme'); }
+  }
+  (function initTheme(){
+    try{ const saved = localStorage.getItem(THEME_KEY); if(saved) applyTheme(saved); }catch(e){}
+  })();
+  el('themeToggle').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    let next;
+    if(!cur){ next = prefersDark ? 'light' : 'dark'; }
+    else if(cur === 'dark'){ next = 'light'; }
+    else { next = 'dark'; }
+    applyTheme(next);
+    try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+  });
+
+  // ---------- 설정 드로어 ----------
+  function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); }
+  function closeDrawer(){ el('drawer').classList.remove('show'); el('overlay').classList.remove('show'); }
+  el('settingsToggle').addEventListener('click', openDrawer);
+  el('drawerClose').addEventListener('click', closeDrawer);
+  el('overlay').addEventListener('click', closeDrawer);
+
+  // ---------- 내보내기 / 가져오기 ----------
+  function doExport(){
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `여행경비백업_${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('백업 파일을 내려받았습니다');
+  }
+  function doImportFile(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const parsed = JSON.parse(reader.result);
+        if(!parsed.trips || !parsed.expenses){ throw new Error('invalid'); }
+        if(!confirm('현재 데이터를 가져온 파일로 덮어씁니다. 계속할까요?')) return;
+        data = normalizeData(parsed);
+        saveData(data);
+        render();
+        showToast('데이터를 복원했습니다');
+      }catch(e){ showToast('올바른 백업 파일이 아닙니다'); }
+    };
+    reader.readAsText(file);
+  }
+  el('exportBtn').addEventListener('click', doExport);
+  el('drawerExportBtn').addEventListener('click', doExport);
+  el('importBtn').addEventListener('click', () => el('importFile').click());
+  el('drawerImportBtn').addEventListener('click', () => el('importFile').click());
+  el('importFile').addEventListener('change', e => { if(e.target.files[0]) doImportFile(e.target.files[0]); e.target.value=''; });
+
+  // ---------- CSV 내보내기 ----------
+  function doCsvExport(){
+    const rows = [['날짜','카테고리','국가','도시','항목','메모','통화','외화금액','원화금액']];
+    tripExpenses(data.currentTripId).forEach(e => {
+      rows.push([e.date, e.category, e.country, e.city||'', e.item, e.memo||'', e.currency, e.amountForeign||'', e.amountKrw]);
+    });
+    const csv = rows.map(r => r.map(v => {
+      const s = String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(',')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `여행경비_${todayStr()}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('CSV 파일을 내려받았습니다');
+  }
+  el('csvExportBtn').addEventListener('click', doCsvExport);
+
+  // ---------- 정산 리포트 (인쇄/PDF) ----------
+  function buildReport(){
+    const trip = currentTrip();
+    const list = tripExpenses(trip.id);
+    const total = list.reduce((s,e)=>s+e.amountKrw,0);
+    let days = list.length ? new Set(list.map(e=>e.date)).size : 0;
+    const avg = days ? total / days : 0;
+
+    el('reportTripName').textContent = trip.name;
+    el('reportTripRange').textContent = (trip.startDate && trip.endDate) ? `${trip.startDate} ~ ${trip.endDate}` : todayStr();
+    el('reportTotal').textContent = won(total);
+    el('reportAvg').textContent = won(avg);
+    el('reportCount').textContent = list.length + '건';
+    el('reportRows').innerHTML = list.map(e => `<tr>
+      <td>${e.date}</td><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.country)}</td>
+      <td>${escapeHtml(e.item)}</td><td class="num tabular">${e.amountKrw.toLocaleString('ko-KR')}</td>
+    </tr>`).join('');
+  }
+  el('reportBtn').addEventListener('click', () => {
+    buildReport();
+    window.print();
+  });
+
+  // ---------- PWA ----------
+  let deferredInstallPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    el('installBtn').style.display = 'inline-flex';
+  });
+  el('installBtn').addEventListener('click', async () => {
+    if(!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    el('installBtn').style.display = 'none';
+  });
+  window.addEventListener('appinstalled', () => { el('installBtn').style.display = 'none'; });
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  // ---------- init ----------
+  render();
+})();
+</script>
+</body>
+</html>
