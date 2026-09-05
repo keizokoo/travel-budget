@@ -124,7 +124,11 @@
   .sectionhead h3{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:14px; margin:0; }
   .sectionhead .count{ font-size:12px; color:var(--ink2); }
 
-  .filterbar{ display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .filterbar{
+    display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
+    position:sticky; top:0; z-index:5; background:var(--bg); padding:8px 0 10px; margin-top:-8px;
+  }
+  .filterbar.stuck{ box-shadow:0 6px 12px -8px rgba(20,24,30,.25); border-bottom:1px solid var(--line2); }
   .filterbar input, .filterbar select{
     border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font-size:12.5px; background:var(--surface); color:var(--ink);
   }
@@ -141,31 +145,42 @@
   .daygroup-head .dtitle .ddate{ font-weight:500; color:var(--ink2); font-size:11.5px; margin-left:6px; }
   .daygroup-head .dtotal{ font-size:12.5px; font-weight:700; color:var(--ink2); }
 
-  .erow{ display:grid; grid-template-columns:38px 60px 1fr auto 40px; gap:6px; align-items:center; padding:10px 4px; border-bottom:1px solid var(--line); }
-  .erow.headrow{ padding-top:0; padding-bottom:7px; border-bottom:1.5px solid var(--line2); grid-template-columns:38px 60px 1fr auto 40px; }
-  .erow.headrow span{ font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--ink2); }
-  .erow .date{ font-size:11px; color:var(--ink2); white-space:nowrap; }
+  .erow{ position:relative; overflow:hidden; border-bottom:1px solid var(--line); }
+  .erow .swipe-actions{ position:absolute; top:0; right:0; bottom:0; width:84px; display:flex; align-items:stretch; z-index:0; }
+  .erow .swipe-del{ flex:1; background:var(--warn); color:var(--on-warn); border:none; font-size:12px; font-weight:700; }
+  .erow .swipe-content{ position:relative; background:var(--surface); z-index:1; touch-action:pan-y; }
+  .erow.swiped .swipe-content{ transform:translateX(-84px); }
+  .erow .row1{ display:flex; align-items:center; gap:8px; padding:11px 4px; cursor:pointer; }
+  .erow .date{ font-size:11px; color:var(--ink3); white-space:nowrap; width:34px; flex-shrink:0; }
   .erow .cat{
-    font-size:9.5px; font-weight:700; border-radius:999px; padding:2px 7px; width:fit-content; white-space:nowrap;
+    font-size:9.5px; font-weight:700; border-radius:999px; padding:2px 7px; white-space:nowrap; flex-shrink:0;
     color:var(--tagc, var(--ink2)); border:1px solid var(--tagc, var(--line2));
   }
-  .erow .item{ font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .erow .item{ font-weight:700; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+  .erow .dot-ind{ width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+  .erow .amt{ font-weight:700; font-size:12.5px; white-space:nowrap; flex-shrink:0; text-align:right; }
+  .erow .amt .fx{ display:block; font-weight:500; color:var(--ink3); font-size:9.5px; }
+  .erow .chev{ font-size:10px; color:var(--ink3); flex-shrink:0; transition:transform .15s ease; }
+  .erow:not(.collapsed) .chev{ transform:rotate(180deg); }
+  .erow .expand{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:0 4px 12px 42px; }
+  .erow.collapsed .expand{ display:none; }
   .erow .country-badge{
-    grid-column:3/-1; width:fit-content; margin-top:5px;
     display:inline-flex; align-items:center; gap:4px;
     font-size:12.5px; font-weight:700; color:var(--ink2);
     background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
   }
-  .erow .amt{ font-weight:700; font-size:12.5px; white-space:nowrap; }
-  .erow .amt .fx{ display:block; font-weight:500; color:var(--ink3); font-size:9.5px; }
-  .erow .rowbtns{ display:flex; gap:2px; justify-content:flex-end; }
   .miniicon{ background:none; border:none; color:var(--ink2); font-size:12px; padding:2px 3px; border-radius:6px; }
   .miniicon:hover{ color:var(--ink); background:var(--line); }
-  .erow .memo{ grid-column:3/-1; font-size:11px; color:var(--ink2); margin-top:2px; }
-  .erow .receipt-thumb{ grid-column:3/-1; margin-top:4px; }
+  .erow .expand .memo{ font-size:11px; color:var(--ink2); width:100%; }
+  .erow .expand .receipt-thumb{ display:flex; }
   .receipt-thumb img{ height:44px; border-radius:6px; border:1px solid var(--line2); cursor:pointer; }
+  .erow .expand .rowbtns{ display:flex; gap:8px; width:100%; margin-top:2px; }
+  .erow .expand .rowbtns .miniicon{
+    font-size:12px; font-weight:700; padding:6px 12px; border-radius:8px; background:var(--bg); border:1px solid var(--line2); color:var(--ink2);
+    display:inline-flex; align-items:center; gap:4px;
+  }
 
-  .erow.editmode{ grid-template-columns:1fr; gap:6px; padding:12px 4px; }
+  .erow.editmode{ display:grid; grid-template-columns:1fr; gap:6px; padding:12px 4px; overflow:visible; }
   .erow.editmode input, .erow.editmode select{
     width:100%; border:1px solid var(--line2); border-radius:7px; padding:6px 8px; font-size:12.5px; background:var(--bg); color:var(--ink);
   }
@@ -236,6 +251,7 @@
   }
 
   .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 34px; }
+  .toolbar + .toolbar{ margin-top:-24px; }
   .toolbtn{
     background:var(--surface); border:1px solid var(--line2); color:var(--ink); border-radius:9px;
     padding:8px 14px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px;
@@ -319,6 +335,19 @@
   .modal.show{ display:block; opacity:1; transform:translate(-50%,-50%) scale(1); }
   .modal img{ width:100%; border-radius:10px; display:block; margin-bottom:10px; }
   .modal .closebtn{ float:right; background:none; border:none; font-size:18px; color:var(--ink2); }
+
+  .fab{
+    position:fixed; right:20px; bottom:26px; width:56px; height:56px; border-radius:50%;
+    background:var(--accent); color:var(--on-accent); border:none; font-size:28px; font-weight:400; line-height:1;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 10px 24px -8px rgba(193,68,14,.55);
+    z-index:90;
+  }
+  .fab:active{ transform:scale(.94); }
+  .addexpense-modal{ width:min(480px,94vw); text-align:left; }
+  .addexpense-modal .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .addexpense-modal .modal-head h3{ margin:0; font-size:15px; font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; }
+  .addexpense-modal .modal-head .closebtn{ float:none; font-size:20px; }
+  .addexpense-modal .smspaste{ margin-top:0; }
 
   .gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(88px,1fr)); gap:8px; clear:both; }
   .gallery-item{ cursor:pointer; }
@@ -414,7 +443,7 @@
       <span class="count" id="tripLabel"></span>
     </div>
 
-    <div class="filterbar">
+    <div class="filterbar" id="filterbar">
       <input type="search" id="searchInput" placeholder="🔍 항목 검색">
       <select id="filterCategory"><option value="">전체 카테고리</option></select>
       <select id="filterCountry"><option value="">전체 국가</option></select>
@@ -429,53 +458,66 @@
     <div id="dayGroups"></div>
     <div id="emptyState" class="empty" style="display:none;">아직 지출 내역이 없습니다. 아래에서 추가해보세요.</div>
 
-    <div class="smspaste">
-      <textarea id="smsPasteInput" rows="1" placeholder="📩 카드 승인 문자를 여기에 붙여넣으면 아래 입력칸에 자동으로 채워집니다 (해외승인 문자도 인식 시도)"></textarea>
-      <span class="smspaste-note" id="smsPasteNote"></span>
-      <div class="photorecog-row">
-        <input type="file" id="photoRecognizeFile" accept="image/*" style="display:none;">
-        <button type="button" class="photorecog-btn" id="photoRecognizeBtn">📷 사진에서 인식 (영수증 · 승인문자 캡처)</button>
-        <span class="smspaste-note" id="photoRecognizeNote"></span>
-      </div>
-      <div class="photorecog-row">
-        <input type="file" id="bulkPhotoFile" accept="image/*" multiple style="display:none;">
-        <button type="button" class="photorecog-btn" id="bulkPhotoBtn">🗂 영수증 여러 장 한번에 등록</button>
-      </div>
-    </div>
+    <button type="button" class="fab" id="addExpenseFab" title="지출 추가">+</button>
 
-    <div class="addrow">
-      <div class="addrow-card">
-        <div class="quickitems-row" id="quickItemsRow" style="display:none;"></div>
-        <div class="addrow-grid1">
-          <input type="date" id="newDate">
-          <select id="newCategory"></select>
-          <select id="newCountry"></select>
-          <input type="text" id="newCity" placeholder="도시 (선택)">
+    <div class="overlay" id="addExpenseOverlay"></div>
+    <div class="modal addexpense-modal" id="addExpenseModal">
+      <div class="modal-head">
+        <h3>지출 추가</h3>
+        <button class="closebtn" id="addExpenseModalClose">✕</button>
+      </div>
+
+      <div class="smspaste">
+        <textarea id="smsPasteInput" rows="1" placeholder="📩 카드 승인 문자를 여기에 붙여넣으면 아래 입력칸에 자동으로 채워집니다 (해외승인 문자도 인식 시도)"></textarea>
+        <span class="smspaste-note" id="smsPasteNote"></span>
+        <div class="photorecog-row">
+          <input type="file" id="photoRecognizeFile" accept="image/*" style="display:none;">
+          <button type="button" class="photorecog-btn" id="photoRecognizeBtn">📷 사진에서 인식 (영수증 · 승인문자 캡처)</button>
+          <span class="smspaste-note" id="photoRecognizeNote"></span>
         </div>
-        <div class="addrow-grid2">
-          <select id="newCurrency"></select>
-          <input type="number" id="newAmount" placeholder="금액" min="0" step="1">
-          <input type="text" id="newItem" placeholder="지출 항목" list="itemSuggestions">
-          <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
-          <button type="button" class="receiptbtn" id="newReceiptBtn">📷 영수증</button>
-        </div>
-        <div class="fxrow" id="fxRow">
-          <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
-          <div class="tabular" id="fxPreview" style="font-size:12.5px; color:var(--ink2); align-self:center;"></div>
-          <div class="fxnote">해외통화 선택 시 그날 실제 적용된 환율을 입력해주세요. 마지막 입력값을 기억해둡니다.</div>
-        </div>
-        <div class="memorow">
-          <input type="text" id="newMemo" placeholder="메모 (선택)">
-          <button type="button" class="addbtn" id="addExpenseBtn">+ 추가</button>
+        <div class="photorecog-row">
+          <input type="file" id="bulkPhotoFile" accept="image/*" multiple style="display:none;">
+          <button type="button" class="photorecog-btn" id="bulkPhotoBtn">🗂 영수증 여러 장 한번에 등록</button>
         </div>
       </div>
+
+      <div class="addrow">
+        <div class="addrow-card">
+          <div class="quickitems-row" id="quickItemsRow" style="display:none;"></div>
+          <div class="addrow-grid1">
+            <input type="date" id="newDate">
+            <select id="newCategory"></select>
+            <select id="newCountry"></select>
+            <input type="text" id="newCity" placeholder="도시 (선택)">
+          </div>
+          <div class="addrow-grid2">
+            <select id="newCurrency"></select>
+            <input type="number" id="newAmount" placeholder="금액" min="0" step="1">
+            <input type="text" id="newItem" placeholder="지출 항목" list="itemSuggestions">
+            <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
+            <button type="button" class="receiptbtn" id="newReceiptBtn">📷 영수증</button>
+          </div>
+          <div class="fxrow" id="fxRow">
+            <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
+            <div class="tabular" id="fxPreview" style="font-size:12.5px; color:var(--ink2); align-self:center;"></div>
+            <div class="fxnote">해외통화 선택 시 그날 실제 적용된 환율을 입력해주세요. 마지막 입력값을 기억해둡니다.</div>
+          </div>
+          <div class="memorow">
+            <input type="text" id="newMemo" placeholder="메모 (선택)">
+            <button type="button" class="addbtn" id="addExpenseBtn">+ 추가</button>
+          </div>
+        </div>
+      </div>
+      <datalist id="itemSuggestions"></datalist>
     </div>
-    <datalist id="itemSuggestions"></datalist>
 
     <div class="toolbar">
       <button class="toolbtn" id="exportBtn">⬇ 내보내기 (백업 파일)</button>
       <button class="toolbtn" id="importBtn">⬆ 가져오기 (복원)</button>
       <input type="file" id="importFile" accept="application/json" style="display:none;">
+      <button class="toolbtn" id="toolbarMoreBtn">⋯ 더보기</button>
+    </div>
+    <div class="toolbar" id="toolbarExtra" style="display:none;">
       <button class="toolbtn" id="csvExportBtn">📄 CSV 내보내기</button>
       <button class="toolbtn" id="reportBtn">🧾 정산 리포트</button>
       <button class="toolbtn" id="galleryBtn">🖼 영수증 갤러리</button>
@@ -1058,23 +1100,35 @@
     return { label: `Day ${dayNum}`, isNumbered:true };
   }
 
+  let expandedRowIds = new Set();
   function rowHtml(e){
     const catColor = tagColor(data.categories, e.category);
     const fxHtml = e.currency !== 'KRW' ? `<span class="fx">${Number(e.amountForeign).toLocaleString('ko-KR')} ${e.currency}</span>` : '';
     const memoHtml = e.memo ? `<div class="memo">📝 ${escapeHtml(e.memo)}</div>` : '';
     const photoHtml = e.receipt ? `<div class="receipt-thumb"><img src="${e.receipt}" data-photo="${e.id}" alt="영수증"></div>` : '';
-    return `<div class="erow" data-id="${e.id}">
-      <div class="date">${e.date.slice(5).replace('-','.')}</div>
-      <div class="cat" style="--tagc:${catColor};">${escapeHtml(e.category)}</div>
-      <div class="item">${escapeHtml(e.item)}</div>
-      <div class="amt tabular">${won(e.amountKrw)}${fxHtml}</div>
-      <div class="rowbtns">
-        <button class="miniicon" data-edit="${e.id}" title="수정">✎</button>
-        <button class="miniicon" data-del="${e.id}" title="삭제">🗑</button>
+    const hasExtra = !!(e.memo || e.receipt);
+    const expanded = expandedRowIds.has(e.id);
+    return `<div class="erow ${expanded ? '' : 'collapsed'}" data-id="${e.id}">
+      <div class="swipe-actions"><button class="swipe-del" data-del="${e.id}">🗑 삭제</button></div>
+      <div class="swipe-content">
+        <div class="row1" data-toggle="${e.id}">
+          <div class="date">${e.date.slice(5).replace('-','.')}</div>
+          <div class="cat" style="--tagc:${catColor};">${escapeHtml(e.category)}</div>
+          <div class="item">${escapeHtml(e.item)}</div>
+          ${hasExtra ? '<span class="dot-ind"></span>' : ''}
+          <div class="amt tabular">${won(e.amountKrw)}${fxHtml}</div>
+          <span class="chev">▾</span>
+        </div>
+        <div class="expand">
+          <span class="country-badge">🌍 ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
+          ${photoHtml}
+          ${memoHtml}
+          <div class="rowbtns">
+            <button class="miniicon" data-edit="${e.id}" title="수정">✎ 수정</button>
+            <button class="miniicon" data-del="${e.id}" title="삭제">🗑 삭제</button>
+          </div>
+        </div>
       </div>
-      <div class="country-badge">🌍 ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</div>
-      ${memoHtml}
-      ${photoHtml}
     </div>`;
   }
 
@@ -1551,10 +1605,12 @@
     el('newReceiptBtn').textContent = '📷 영수증'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
     updateFxPreview();
     render();
+    closeAddExpenseModal();
     showToast('지출 내역이 추가되었습니다');
   });
 
-  // ---------- 수정/삭제/영수증 보기 ----------
+  // ---------- 수정/삭제/영수증 보기/펼치기 ----------
+  let suppressRowToggle = false;
   el('dayGroups').addEventListener('click', e => {
     const editId = e.target.dataset.edit;
     const delId = e.target.dataset.del;
@@ -1563,14 +1619,66 @@
     if(delId){
       if(confirm('이 지출 내역을 삭제할까요?')){
         data.expenses = data.expenses.filter(x=>x.id!==delId);
+        expandedRowIds.delete(delId);
         saveData(data); render();
         showToast('삭제되었습니다');
       }
+      return;
     }
     if(photoId){
       const exp = data.expenses.find(x=>x.id===photoId);
       if(exp && exp.receipt){ el('photoModalImg').src = exp.receipt; openPhotoModal(); }
+      return;
     }
+    const toggleRow = e.target.closest('.row1');
+    if(toggleRow && !suppressRowToggle){
+      const id = toggleRow.dataset.toggle;
+      const row = toggleRow.closest('.erow');
+      if(row.classList.contains('swiped')){ row.classList.remove('swiped'); return; }
+      const willExpand = row.classList.contains('collapsed');
+      row.classList.toggle('collapsed');
+      if(willExpand) expandedRowIds.add(id); else expandedRowIds.delete(id);
+    }
+  });
+
+  // 스와이프로 삭제 (모바일 터치 제스처)
+  let swipeState = null;
+  const SWIPE_W = 84;
+  el('dayGroups').addEventListener('touchstart', e => {
+    const content = e.target.closest('.swipe-content');
+    if(!content) return;
+    const row = content.closest('.erow');
+    document.querySelectorAll('.erow.swiped').forEach(r => { if(r !== row) r.classList.remove('swiped'); });
+    const t = e.touches[0];
+    swipeState = { row, content, startX: t.clientX, startY: t.clientY, baseX: row.classList.contains('swiped') ? -SWIPE_W : 0, dx: 0, locked: null };
+  }, { passive: true });
+  el('dayGroups').addEventListener('touchmove', e => {
+    if(!swipeState) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeState.startX;
+    const dy = t.clientY - swipeState.startY;
+    if(swipeState.locked === null){
+      if(Math.abs(dx) > 6 || Math.abs(dy) > 6){ swipeState.locked = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'; }
+    }
+    if(swipeState.locked !== 'x') return;
+    e.preventDefault();
+    let next = swipeState.baseX + dx;
+    next = Math.max(-SWIPE_W, Math.min(0, next));
+    swipeState.dx = next;
+    swipeState.content.style.transition = 'none';
+    swipeState.content.style.transform = `translateX(${next}px)`;
+  }, { passive: false });
+  el('dayGroups').addEventListener('touchend', () => {
+    if(!swipeState) return;
+    const { row, content, locked, dx } = swipeState;
+    content.style.transition = '';
+    content.style.transform = '';
+    if(locked === 'x'){
+      if(dx <= -SWIPE_W/2){ row.classList.add('swiped'); } else { row.classList.remove('swiped'); }
+      suppressRowToggle = true;
+      setTimeout(() => { suppressRowToggle = false; }, 80);
+    }
+    swipeState = null;
   });
 
   function enterEditMode(id){
@@ -1614,6 +1722,19 @@
   function closePhotoModal(){ el('photoModal').classList.remove('show'); el('photoOverlay').classList.remove('show'); }
   el('photoClose').addEventListener('click', closePhotoModal);
   el('photoOverlay').addEventListener('click', closePhotoModal);
+
+  // ---------- 지출 추가 (FAB + 모달) ----------
+  function openAddExpenseModal(){
+    el('addExpenseModal').classList.add('show');
+    el('addExpenseOverlay').classList.add('show');
+  }
+  function closeAddExpenseModal(){
+    el('addExpenseModal').classList.remove('show');
+    el('addExpenseOverlay').classList.remove('show');
+  }
+  el('addExpenseFab').addEventListener('click', openAddExpenseModal);
+  el('addExpenseModalClose').addEventListener('click', closeAddExpenseModal);
+  el('addExpenseOverlay').addEventListener('click', closeAddExpenseModal);
 
   // ---------- 영수증 갤러리 ----------
   function renderGallery(){
@@ -1993,7 +2114,16 @@
       showToast('Drive에서 데이터를 불러왔습니다');
     }catch(e){ showToast('불러오기 실패: URL과 배포 설정을 확인해주세요 (CORS/권한)'); }
   }
-  el('driveSyncNowBtn').addEventListener('click', () => { openDrawer(); });
+  el('driveSyncNowBtn').addEventListener('click', () => {
+    if(!data.settings.driveUrl){ openDrawer(); showToast('Google Drive 백업 URL을 먼저 설정해주세요'); return; }
+    backupToDrive(false);
+  });
+  el('toolbarMoreBtn').addEventListener('click', () => {
+    const extra = el('toolbarExtra');
+    const showing = extra.style.display !== 'none';
+    extra.style.display = showing ? 'none' : 'flex';
+    el('toolbarMoreBtn').textContent = showing ? '⋯ 더보기' : '⋯ 접기';
+  });
   el('drawerBackupNow').addEventListener('click', () => backupToDrive(false));
   el('drawerRestoreFromDrive').addEventListener('click', restoreFromDrive);
   el('autoBackupToggle').addEventListener('change', e => {
@@ -2092,6 +2222,13 @@
       navigator.serviceWorker.register('sw.js').catch(() => {});
     });
   }
+
+  // ---------- 필터바 스크롤 고정 시 그림자 ----------
+  window.addEventListener('scroll', () => {
+    const bar = el('filterbar');
+    if(!bar) return;
+    bar.classList.toggle('stuck', bar.getBoundingClientRect().top <= 0);
+  }, { passive: true });
 
   // ---------- init ----------
   render();
