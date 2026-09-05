@@ -241,9 +241,14 @@
   .drawer .addchip button{ background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; }
   .drawer .fieldrow{ margin-bottom:10px; }
   .drawer label{ display:block; font-size:12px; color:var(--ink2); margin-bottom:5px; }
-  .drawer input[type=text], .drawer input[type=number], .drawer input[type=date]{
+  .drawer input[type=text], .drawer input[type=number], .drawer input[type=date], .drawer input[type=url]{
     width:100%; border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font-size:12.5px; background:var(--bg); color:var(--ink);
   }
+  .drawer select{
+    width:100%; border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); margin-top:6px;
+  }
+  .drawer .checkrow{ display:flex; align-items:center; gap:6px; margin-top:10px; font-size:12.5px; }
+  .drawer .checkrow input[type=checkbox]{ width:auto; }
   .drawer .daterow{ display:flex; gap:8px; align-items:center; }
   .drawer .syncbtns{ display:flex; gap:8px; margin-top:10px; }
   .drawer .syncbtns button{ flex:1; border-radius:8px; border:1px solid var(--line2); background:var(--surface); color:var(--ink); padding:8px; font-size:12px; font-weight:700; }
@@ -406,6 +411,7 @@
       <input type="file" id="importFile" accept="application/json" style="display:none;">
       <button class="toolbtn" id="csvExportBtn">📄 CSV 내보내기</button>
       <button class="toolbtn" id="reportBtn">🧾 정산 리포트</button>
+      <button class="toolbtn" id="driveSyncNowBtn">☁ Google Drive로 백업</button>
     </div>
 
   </div>
@@ -493,6 +499,27 @@
     </div>
 
     <div class="block">
+      <h4>Google Drive 자동 백업</h4>
+      <input type="url" id="driveUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      <span class="note" id="driveUrlNote" style="display:block; margin-top:4px;"></span>
+      <div class="syncbtns">
+        <button class="primary" id="drawerBackupNow">☁ 지금 백업</button>
+        <button id="drawerRestoreFromDrive">⬇ Drive에서 복원</button>
+      </div>
+      <label class="checkrow"><input type="checkbox" id="autoBackupToggle">변경할 때마다 자동으로 백업</label>
+      <label class="checkrow"><input type="checkbox" id="periodicBackupToggle">주기적으로 자동 백업 (앱을 열어둔 동안)</label>
+      <select id="periodicIntervalSelect" style="display:none;">
+        <option value="15">15분마다</option>
+        <option value="30">30분마다</option>
+        <option value="60" selected>1시간마다</option>
+        <option value="180">3시간마다</option>
+        <option value="360">6시간마다</option>
+      </select>
+      <p class="note" id="lastBackupTime" style="margin-top:8px;"></p>
+      <p class="note" style="margin-top:6px;">URL은 Apps Script를 웹 앱으로 배포하면 발급됩니다. 영수증 사진을 포함한 전체 데이터가 Google Drive에 JSON 파일로 저장되며, 최근 5개 이력도 함께 보관됩니다.</p>
+    </div>
+
+    <div class="block">
       <h4>여행 삭제</h4>
       <p class="note">현재 선택된 여행과 그 안의 모든 지출 내역이 삭제됩니다. 되돌릴 수 없으니 먼저 내보내기로 백업해두세요.</p>
       <button class="toolbtn warn-btn" id="deleteTripBtn" style="width:100%; justify-content:center; border-color:var(--warn); color:var(--warn);">이 여행 삭제</button>
@@ -529,7 +556,7 @@
   const THEME_KEY = "travel_budget_theme_v1";
 
   const DEFAULT_CATEGORIES = ["식사","숙소","교통","기타"];
-  const DEFAULT_COUNTRIES = ["영국","스페인"];
+  const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
 
   const TAG_COLOR_PALETTE = ["#C1440E","#2F6FE0","#1F8A6B","#9B5CF0","#B08900","#5B7A99","#C1447A"];
@@ -552,7 +579,8 @@
       trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "", budget: 0 }],
       currentTripId: tripId,
       expenses: [],
-      lastFxRate: {}
+      lastFxRate: {},
+      settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
   }
 
@@ -568,6 +596,18 @@
     if(!d.currentTripId || !d.trips.find(t => t.id === d.currentTripId)) d.currentTripId = d.trips[0].id;
     if(!d.expenses) d.expenses = [];
     if(!d.lastFxRate) d.lastFxRate = {};
+    if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
+    if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
+    if(typeof d.settings.autoBackup !== 'boolean') d.settings.autoBackup = false;
+    if(typeof d.settings.periodicBackup !== 'boolean') d.settings.periodicBackup = false;
+    if(!d.settings.periodicIntervalMinutes) d.settings.periodicIntervalMinutes = 60;
+
+    // 일회성 마이그레이션: 기존 데이터에 "한국"이 국가 목록에 없으면 한 번만 추가 (이후 사용자가 지워도 다시 추가하지 않음)
+    if(!d._migrations) d._migrations = {};
+    if(!d._migrations.addKoreaCountry){
+      if(!d.countries.includes('한국')) d.countries.push('한국');
+      d._migrations.addKoreaCountry = true;
+    }
     return d;
   }
 
@@ -586,11 +626,16 @@
     return seed;
   }
 
+  let autoBackupTimer = null;
   function saveData(d){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
     catch(e){
       console.warn("save failed", e);
       showToast("저장 실패: 브라우저 저장공간이 가득 찼을 수 있어요. 오래된 영수증 사진을 정리해주세요.");
+    }
+    if(d.settings && d.settings.autoBackup && d.settings.driveUrl){
+      clearTimeout(autoBackupTimer);
+      autoBackupTimer = setTimeout(() => { backupToDrive(true); }, 1500);
     }
   }
 
@@ -682,7 +727,7 @@
   function renderCategoryOptions(){
     const sel = el('newCategory');
     const prev = sel.value;
-    sel.innerHTML = data.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.innerHTML = data.categories.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="__addnew__">+ 새 카테고리 추가</option>';
     if(data.categories.includes(prev)) sel.value = prev;
 
     const filterSel = el('filterCategory');
@@ -693,7 +738,7 @@
   function renderCountryOptions(){
     const sel = el('newCountry');
     const prev = sel.value;
-    sel.innerHTML = data.countries.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.innerHTML = data.countries.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="__addnew__">+ 새 국가 추가</option>';
     if(data.countries.includes(prev)) sel.value = prev;
 
     const filterSel = el('filterCountry');
@@ -701,6 +746,25 @@
     filterSel.innerHTML = '<option value="">전체 국가</option>' + data.countries.map(c => `<option value="${c}">${c}</option>`).join('');
     filterSel.value = data.countries.includes(prevF) ? prevF : '';
   }
+  // 지출 추가 화면 드롭다운에서 바로 새 카테고리/국가를 추가할 수 있게 함 (설정 화면까지 갔다 올 필요 없이)
+  el('newCategory').addEventListener('change', () => {
+    const sel = el('newCategory');
+    if(sel.value !== '__addnew__') return;
+    const name = (prompt('추가할 카테고리 이름을 입력하세요') || '').trim();
+    if(name && !data.categories.includes(name)){ data.categories.push(name); saveData(data); }
+    renderCategoryOptions();
+    renderChips();
+    sel.value = (name && data.categories.includes(name)) ? name : (data.categories[0] || '');
+  });
+  el('newCountry').addEventListener('change', () => {
+    const sel = el('newCountry');
+    if(sel.value !== '__addnew__') return;
+    const name = (prompt('추가할 국가 이름을 입력하세요') || '').trim();
+    if(name && !data.countries.includes(name)){ data.countries.push(name); saveData(data); }
+    renderCountryOptions();
+    renderChips();
+    sel.value = (name && data.countries.includes(name)) ? name : (data.countries[0] || '');
+  });
 
   function renderChips(){
     const usedCats = new Set(data.expenses.map(e=>e.category));
@@ -911,6 +975,7 @@
     renderChips();
     renderItemSuggestions();
     renderStorageUsage();
+    renderBackupSettings();
 
     const trip = currentTrip();
     const list = tripExpenses(trip.id);
@@ -1273,6 +1338,8 @@
     const memo = el('newMemo').value.trim();
 
     if(!date){ showToast('날짜를 선택해주세요'); return; }
+    if(category === '__addnew__'){ showToast('카테고리를 선택해주세요'); return; }
+    if(country === '__addnew__'){ showToast('국가를 선택해주세요'); return; }
     if(!item){ showToast('지출 항목을 입력해주세요'); return; }
     if(!amount || amount <= 0){ showToast('금액을 입력해주세요'); return; }
     if(currency !== 'KRW' && (!fxRate || fxRate <= 0)){ showToast('환율을 입력해주세요'); return; }
@@ -1463,6 +1530,117 @@
   el('importBtn').addEventListener('click', () => el('importFile').click());
   el('drawerImportBtn').addEventListener('click', () => el('importFile').click());
   el('importFile').addEventListener('change', e => { if(e.target.files[0]) doImportFile(e.target.files[0]); e.target.value=''; });
+
+  // ---------- Google Drive 자동 백업 ----------
+  function persistOnly(d){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }catch(e){}
+  }
+
+  function renderBackupSettings(){
+    if(document.activeElement !== el('driveUrlInput')) el('driveUrlInput').value = data.settings.driveUrl || '';
+    el('autoBackupToggle').checked = !!data.settings.autoBackup;
+    el('periodicBackupToggle').checked = !!data.settings.periodicBackup;
+    el('periodicIntervalSelect').style.display = data.settings.periodicBackup ? 'block' : 'none';
+    el('periodicIntervalSelect').value = String(data.settings.periodicIntervalMinutes || 60);
+    el('lastBackupTime').textContent = data.settings.lastBackup
+      ? `마지막 백업: ${new Date(data.settings.lastBackup).toLocaleString('ko-KR')}`
+      : '아직 백업한 적 없음';
+  }
+
+  function saveDriveUrl(showNote, allowClear){
+    const val = el('driveUrlInput').value.trim();
+    if(data.settings.driveUrl === val) return;
+    if(!val && data.settings.driveUrl && !allowClear) return;
+    const hadNoUrlBefore = !data.settings.driveUrl;
+    data.settings.driveUrl = val;
+    // URL을 처음 등록하는 순간, 별도 토글 조작 없이도 자동 백업이 바로 켜지도록 기본 활성화
+    if(val && hadNoUrlBefore && !data.settings.autoBackup){
+      data.settings.autoBackup = true;
+    }
+    saveData(data);
+    renderBackupSettings();
+    if(showNote){
+      const note = el('driveUrlNote');
+      note.textContent = val ? (data.settings.autoBackup ? '✓ 저장됨 · 변경 시 자동 백업 켜짐' : '✓ 저장됨') : '';
+      setTimeout(() => { note.textContent = ''; }, 3000);
+    }
+  }
+  let driveUrlSaveTimer = null;
+  el('driveUrlInput').addEventListener('input', () => {
+    clearTimeout(driveUrlSaveTimer);
+    driveUrlSaveTimer = setTimeout(() => saveDriveUrl(true), 500);
+  });
+  el('driveUrlInput').addEventListener('blur', () => { clearTimeout(driveUrlSaveTimer); saveDriveUrl(true, true); });
+
+  async function backupToDrive(silent){
+    const url = data.settings.driveUrl;
+    if(!url){ if(!silent) showToast('먼저 Apps Script URL을 입력해주세요'); return; }
+    try{
+      if(!silent) showToast('백업 중... (영수증 사진이 많으면 시간이 걸릴 수 있어요)');
+      await fetch(url, {
+        method:'POST',
+        mode:'no-cors',
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        body: JSON.stringify(data)
+      });
+      data.settings.lastBackup = new Date().toISOString();
+      persistOnly(data); // lastBackup 기록만 반영 (자동백업 재귀 방지)
+      renderBackupSettings();
+      showToast(silent ? '자동 백업 완료' : 'Google Drive로 백업했습니다');
+    }catch(e){ if(!silent) showToast('백업 실패: URL과 배포 설정을 확인해주세요'); }
+  }
+  async function restoreFromDrive(){
+    const url = data.settings.driveUrl;
+    if(!url){ showToast('먼저 Apps Script URL을 입력해주세요'); return; }
+    try{
+      showToast('불러오는 중...');
+      const res = await fetch(url, { method:'GET' });
+      const json = await res.json();
+      if(!json || !json.trips || !json.expenses){ throw new Error('invalid'); }
+      if(!confirm('Drive에 백업된 데이터로 현재 데이터를 덮어씁니다. 계속할까요?')) return;
+      const restoredUrl = url;
+      data = normalizeData(json);
+      data.settings.driveUrl = restoredUrl;
+      saveData(data);
+      render();
+      showToast('Drive에서 데이터를 불러왔습니다');
+    }catch(e){ showToast('불러오기 실패: URL과 배포 설정을 확인해주세요 (CORS/권한)'); }
+  }
+  el('driveSyncNowBtn').addEventListener('click', () => { openDrawer(); });
+  el('drawerBackupNow').addEventListener('click', () => backupToDrive(false));
+  el('drawerRestoreFromDrive').addEventListener('click', restoreFromDrive);
+  el('autoBackupToggle').addEventListener('change', e => {
+    data.settings.autoBackup = e.target.checked;
+    saveData(data);
+    if(e.target.checked && data.settings.driveUrl) showToast('자동 백업이 켜졌습니다');
+  });
+
+  // ---------- 주기적 백업 (앱이 열려있는 동안 일정 주기로 백업) ----------
+  let periodicBackupTimer = null;
+  function schedulePeriodicBackup(){
+    clearInterval(periodicBackupTimer);
+    periodicBackupTimer = null;
+    if(!data.settings.periodicBackup || !data.settings.driveUrl) return;
+    const ms = Math.max(5, Number(data.settings.periodicIntervalMinutes) || 60) * 60 * 1000;
+    periodicBackupTimer = setInterval(() => { backupToDrive(true); }, ms);
+  }
+  el('periodicBackupToggle').addEventListener('change', e => {
+    data.settings.periodicBackup = e.target.checked;
+    saveData(data);
+    renderBackupSettings();
+    schedulePeriodicBackup();
+    if(e.target.checked){
+      if(!data.settings.driveUrl){ showToast('먼저 Apps Script URL을 입력해주세요'); }
+      else showToast(`${data.settings.periodicIntervalMinutes}분마다 자동 백업됩니다 (이 화면이 열려있는 동안)`);
+    }
+  });
+  el('periodicIntervalSelect').addEventListener('change', e => {
+    data.settings.periodicIntervalMinutes = Number(e.target.value);
+    saveData(data);
+    schedulePeriodicBackup();
+    showToast(`${e.target.value}분마다 백업하도록 설정했습니다`);
+  });
+  schedulePeriodicBackup();
 
   // ---------- CSV 내보내기 ----------
   function doCsvExport(){
