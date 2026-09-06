@@ -1478,7 +1478,10 @@
           if(!data.placeNameCache) data.placeNameCache = {};
           data.placeNameCache[key] = { name: result.name, precise: result.precise, resolvedAt: new Date().toISOString() };
           saveData(data);
-          const typingInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('#itineraryDays');
+          // 메모(textarea) 입력 중에만 다시그리기를 미룬다. "전체 이동 경로 상세보기" 같은 <details>를
+          // 펼쳐서 포커스가 가 있는 경우까지 막으면, 그 상태로 도착한 장소명이 화면에 영영 반영되지 않는다.
+          const typingInside = document.activeElement && document.activeElement.tagName === 'TEXTAREA'
+            && document.activeElement.closest && document.activeElement.closest('#itineraryDays');
           if(activeMainTab === 'itinerary' && !typingInside) renderItineraryTab();
         }
       });
@@ -1486,12 +1489,13 @@
   function enqueueGeocodesForTrip(tripId){
     const bucket = data.timelineByTrip && data.timelineByTrip[tripId];
     if(!bucket) return;
-    const trip = data.trips.find(t => t.id === tripId);
-    if(!trip) return;
-    tripDateRange(trip).forEach(dateStr => {
-      computeDaySpots(trip, dateStr).forEach(spot => {
-        if(!spot.label) enqueueGeocode(spot.lat, spot.lng);
-      });
+    // 병합된 "오늘 방문한 곳" 목록 좌표뿐 아니라, 전체 이동 경로 상세보기에 표시되는
+    // 개별 방문 기록의 좌표도 전부 큐에 넣는다. 그렇지 않으면 병합 과정에서 대표 좌표로
+    // 선택되지 못한 방문 기록은 영원히 "위치 확인 중…" 상태로 남게 된다.
+    bucket.visits.forEach(v => {
+      if(v.kind === 'visit' && v.lat != null && v.lng != null && !v.label){
+        enqueueGeocode(v.lat, v.lng);
+      }
     });
   }
 
@@ -1598,12 +1602,14 @@
       <span class="route-place">${placeHtml}</span>
     </div>`;
   }
+  const openRouteDetails = new Set(); // 장소명 도착으로 다시그리기될 때도 펼친 상태가 접히지 않도록 날짜별로 기억
   function dayTimelineHtml(trip, dateStr){
     const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
     if(!bucket || !bucket.visits.length) return '';
     const dayVisits = bucket.visits.filter(v => v.date === dateStr).sort((a,b)=> (a.startTime||'').localeCompare(b.startTime||''));
     if(!dayVisits.length) return '';
-    return `<details class="day-route">
+    const openAttr = openRouteDetails.has(dateStr) ? ' open' : '';
+    return `<details class="day-route" data-route-date="${dateStr}"${openAttr}>
       <summary class="day-route-label">🧭 전체 이동 경로 상세보기</summary>
       ${dayVisits.map(v => routeItemHtml(v)).join('')}
     </details>`;
@@ -2511,6 +2517,15 @@
     clearTimeout(dayNoteSaveTimer);
     dayNoteSaveTimer = setTimeout(() => saveData(data), 400);
   });
+
+  // ---------- 일자별 요약: 전체 이동 경로 상세보기 펼침 상태 기억 (장소명 도착 시 다시그리기돼도 접히지 않도록) ----------
+  el('itineraryDays').addEventListener('toggle', e => {
+    const details = e.target.closest && e.target.closest('[data-route-date]');
+    if(!details) return;
+    const dateStr = details.dataset.routeDate;
+    if(details.open) openRouteDetails.add(dateStr);
+    else openRouteDetails.delete(dateStr);
+  }, true); // toggle 이벤트는 버블링되지 않으므로 캡처 단계에서 감지
 
   // ---------- 일자별 요약: 방문 스팟 이름 직접 수정 ----------
   el('itineraryDays').addEventListener('click', e => {
