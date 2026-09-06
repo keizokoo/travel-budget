@@ -124,6 +124,14 @@
   .sectionhead h3{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:14px; margin:0; }
   .sectionhead .count{ font-size:12px; color:var(--ink2); }
 
+  /* ---------- 메인 탭(지출/일정) ---------- */
+  .maintabs{ display:flex; gap:6px; margin-bottom:20px; background:var(--surface); border:1px solid var(--line2); border-radius:12px; padding:4px; }
+  .maintab{
+    flex:1; background:none; border:none; border-radius:9px; padding:10px 8px; font-size:13px; font-weight:700;
+    color:var(--ink2); display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .maintab.active{ background:var(--ink); color:var(--bg); }
+
   .filterbar{
     display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
     position:sticky; top:0; z-index:5; background:var(--bg); padding:8px 0 10px; margin-top:-8px;
@@ -194,6 +202,63 @@
   .erow.editmode .rowbtns .miniicon.cancel-btn:hover{ background:var(--line); color:var(--ink); }
 
   .empty{ text-align:center; padding:34px 10px; color:var(--ink2); font-size:13px; }
+
+  /* ---------- 여행 일정 ---------- */
+  .itin-daycard{
+    background:var(--surface); border:1px solid var(--line2); border-radius:14px;
+    padding:14px 14px 12px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .itin-daycard-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .itin-daytitle{ font-weight:700; font-size:13.5px; font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; }
+  .itin-daydate{ font-size:11.5px; color:var(--ink2); }
+  .itin-empty-note{ font-size:12px; color:var(--ink3); padding:4px 0 8px; }
+  .itin-items{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
+  .itin-item{ display:flex; align-items:center; gap:9px; padding:7px 2px; border-bottom:1px solid var(--line); }
+  .itin-item:last-child{ border-bottom:none; }
+  .itin-time{ font-size:11.5px; font-weight:700; color:var(--accent); width:44px; flex-shrink:0; }
+  .itin-time-empty{ color:var(--ink3); text-align:center; }
+  .itin-text{ flex:1; font-size:12.5px; }
+  .itin-photos{ display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:8px; margin-bottom:10px; }
+  .itin-photo{ position:relative; }
+  .itin-photo img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; border:1px solid var(--line2); cursor:pointer; display:block; }
+  .itin-photo-del{
+    position:absolute; top:-6px; right:-6px; width:19px; height:19px; border-radius:50%;
+    background:var(--warn); color:var(--on-warn); border:2px solid var(--surface); font-size:10px; line-height:1;
+    display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .itin-links{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .itin-link{
+    display:flex; align-items:center; gap:8px; border:1px solid var(--line2); background:var(--bg);
+    border-radius:9px; padding:7px 10px;
+  }
+  .itin-link a{
+    flex:1; min-width:0; color:var(--ink); font-size:12px; font-weight:600; text-decoration:none;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .itin-link a:hover{ color:var(--accent); }
+  .itin-link-del{ background:none; border:none; color:var(--ink3); font-size:12px; flex-shrink:0; padding:2px; }
+  .itin-link-del:hover{ color:var(--warn); }
+  .itin-addbtn{
+    display:block; width:100%; text-align:center;
+    border:1px dashed var(--ink3); background:var(--bg); color:var(--ink2);
+    border-radius:9px; padding:9px 12px; font-size:12px; font-weight:700;
+  }
+  .itin-addbtn:hover{ border-color:var(--accent); color:var(--accent); }
+
+  .itin-add-modal{ width:min(420px,92vw); text-align:left; }
+  .itin-add-section{ margin-bottom:16px; }
+  .itin-add-section:last-child{ margin-bottom:4px; }
+  .itin-add-label{ display:block; font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
+  .itin-add-row{ display:flex; gap:8px; }
+  .itin-add-row input[type=time]{ width:92px; flex-shrink:0; }
+  .itin-add-row input{
+    border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink); min-width:0;
+  }
+  .itin-add-row input[type=text], .itin-add-row input[type=url]{ flex:1; }
+  .itin-add-row input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .itin-add-row button.addbtn{
+    background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; white-space:nowrap; flex-shrink:0;
+  }
 
   /* ---------- 문자 붙여넣기 ---------- */
   .smspaste{ margin-top:4px; margin-bottom:14px; }
@@ -416,6 +481,13 @@
 <div class="wrap">
   <div class="body">
 
+    <div class="maintabs">
+      <button type="button" class="maintab active" id="tabExpenseBtn" data-tab="expense">💰 지출 내역</button>
+      <button type="button" class="maintab" id="tabItineraryBtn" data-tab="itinerary">🗓 여행 일정</button>
+    </div>
+
+    <div id="expenseTabPanel">
+
     <div class="panels">
       <div class="panel">
         <div class="panel-title">카테고리별 비중</div>
@@ -519,6 +591,45 @@
       <button class="toolbtn" id="driveSyncNowBtn">☁ Google Drive로 백업</button>
     </div>
 
+    </div>
+
+    <div id="itineraryTabPanel" style="display:none;">
+      <div class="sectionhead">
+        <h3>여행 일정</h3>
+        <span class="count" id="itineraryLabel"></span>
+      </div>
+      <div id="itineraryDays"></div>
+      <div id="itineraryEmptyState" class="empty" style="display:none;"></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="overlay" id="itinAddOverlay"></div>
+<div class="modal itin-add-modal" id="itinAddModal">
+  <div class="modal-head">
+    <h3 id="itinAddModalTitle">일정 추가</h3>
+    <button class="closebtn" id="itinAddModalClose">✕</button>
+  </div>
+  <div class="itin-add-section">
+    <label class="itin-add-label">📝 일정 (시간 + 내용)</label>
+    <div class="itin-add-row">
+      <input type="time" id="itinNewTime">
+      <input type="text" id="itinNewText" placeholder="예: 공항 도착, 호텔 체크인">
+      <button type="button" class="addbtn" id="itinAddItemBtn">추가</button>
+    </div>
+  </div>
+  <div class="itin-add-section">
+    <label class="itin-add-label">📷 사진</label>
+    <input type="file" id="itinPhotoFile" accept="image/*" multiple style="display:none;">
+    <button type="button" class="photorecog-btn" id="itinPhotoBtn">사진 추가 (여러 장 선택 가능)</button>
+  </div>
+  <div class="itin-add-section">
+    <label class="itin-add-label">🔗 링크</label>
+    <div class="itin-add-row">
+      <input type="url" id="itinNewLink" placeholder="https://...">
+      <button type="button" class="addbtn" id="itinAddLinkBtn">추가</button>
+    </div>
   </div>
 </div>
 
@@ -695,6 +806,32 @@
     return TAG_COLOR_PALETTE[(idx >= 0 ? idx : 0) % TAG_COLOR_PALETTE.length];
   }
 
+  // ---------- 국가명(한글) → 국기 이모지 ----------
+  const COUNTRY_FLAGS = {
+    "한국":"🇰🇷","대한민국":"🇰🇷","영국":"🇬🇧","스페인":"🇪🇸","프랑스":"🇫🇷","이탈리아":"🇮🇹","독일":"🇩🇪",
+    "미국":"🇺🇸","일본":"🇯🇵","중국":"🇨🇳","대만":"🇹🇼","홍콩":"🇭🇰","마카오":"🇲🇴","태국":"🇹🇭","베트남":"🇻🇳",
+    "필리핀":"🇵🇭","싱가포르":"🇸🇬","말레이시아":"🇲🇾","인도네시아":"🇮🇩","캄보디아":"🇰🇭","라오스":"🇱🇦",
+    "미얀마":"🇲🇲","인도":"🇮🇳","네팔":"🇳🇵","스리랑카":"🇱🇰","몰디브":"🇲🇻","몽골":"🇲🇳","호주":"🇦🇺",
+    "오스트레일리아":"🇦🇺","뉴질랜드":"🇳🇿","캐나다":"🇨🇦","멕시코":"🇲🇽","브라질":"🇧🇷","아르헨티나":"🇦🇷",
+    "칠레":"🇨🇱","페루":"🇵🇪","콜롬비아":"🇨🇴","에콰도르":"🇪🇨","볼리비아":"🇧🇴","파라과이":"🇵🇾","우루과이":"🇺🇾",
+    "베네수엘라":"🇻🇪","코스타리카":"🇨🇷","파나마":"🇵🇦","과테말라":"🇬🇹","쿠바":"🇨🇺","자메이카":"🇯🇲",
+    "도미니카공화국":"🇩🇴","바하마":"🇧🇸","포르투갈":"🇵🇹","네덜란드":"🇳🇱","벨기에":"🇧🇪","스위스":"🇨🇭",
+    "오스트리아":"🇦🇹","그리스":"🇬🇷","터키":"🇹🇷","튀르키예":"🇹🇷","러시아":"🇷🇺","폴란드":"🇵🇱","체코":"🇨🇿",
+    "헝가리":"🇭🇺","덴마크":"🇩🇰","스웨덴":"🇸🇪","노르웨이":"🇳🇴","핀란드":"🇫🇮","아이슬란드":"🇮🇸","아일랜드":"🇮🇪",
+    "크로아티아":"🇭🇷","슬로베니아":"🇸🇮","슬로바키아":"🇸🇰","루마니아":"🇷🇴","불가리아":"🇧🇬","우크라이나":"🇺🇦",
+    "몰타":"🇲🇹","룩셈부르크":"🇱🇺","모나코":"🇲🇨","안도라":"🇦🇩","리히텐슈타인":"🇱🇮","세르비아":"🇷🇸",
+    "몬테네그로":"🇲🇪","보스니아헤르체고비나":"🇧🇦","알바니아":"🇦🇱","북마케도니아":"🇲🇰","마케도니아":"🇲🇰",
+    "조지아":"🇬🇪","아르메니아":"🇦🇲","아제르바이잔":"🇦🇿","카자흐스탄":"🇰🇿","우즈베키스탄":"🇺🇿",
+    "키르기스스탄":"🇰🇬","타지키스탄":"🇹🇯","투르크메니스탄":"🇹🇲","방글라데시":"🇧🇩","파키스탄":"🇵🇰",
+    "아프가니스탄":"🇦🇫","이란":"🇮🇷","이라크":"🇮🇶","레바논":"🇱🇧","키프로스":"🇨🇾","이집트":"🇪🇬","모로코":"🇲🇦",
+    "튀니지":"🇹🇳","알제리":"🇩🇿","남아프리카공화국":"🇿🇦","케냐":"🇰🇪","탄자니아":"🇹🇿","에티오피아":"🇪🇹",
+    "아랍에미리트":"🇦🇪","카타르":"🇶🇦","사우디아라비아":"🇸🇦","쿠웨이트":"🇰🇼","오만":"🇴🇲","바레인":"🇧🇭",
+    "이스라엘":"🇮🇱","요르단":"🇯🇴","피지":"🇫🇯"
+  };
+  function countryFlag(name){
+    return COUNTRY_FLAGS[name] || '🌍';
+  }
+
   function uid(){
     if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'id_' + Date.now() + '_' + Math.random().toString(16).slice(2);
@@ -709,6 +846,7 @@
       trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "", budget: 0 }],
       currentTripId: tripId,
       expenses: [],
+      itineraryDays: [],
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -725,6 +863,7 @@
     }
     if(!d.currentTripId || !d.trips.find(t => t.id === d.currentTripId)) d.currentTripId = d.trips[0].id;
     if(!d.expenses) d.expenses = [];
+    if(!d.itineraryDays) d.itineraryDays = [];
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -868,12 +1007,12 @@
   function renderCountryOptions(){
     const sel = el('newCountry');
     const prev = sel.value;
-    sel.innerHTML = data.countries.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="__addnew__">+ 새 국가 추가</option>';
+    sel.innerHTML = data.countries.map(c => `<option value="${c}">${countryFlag(c)} ${c}</option>`).join('') + '<option value="__addnew__">+ 새 국가 추가</option>';
     if(data.countries.includes(prev)) sel.value = prev;
 
     const filterSel = el('filterCountry');
     const prevF = filterSel.value;
-    filterSel.innerHTML = '<option value="">전체 국가</option>' + data.countries.map(c => `<option value="${c}">${c}</option>`).join('');
+    filterSel.innerHTML = '<option value="">전체 국가</option>' + data.countries.map(c => `<option value="${c}">${countryFlag(c)} ${c}</option>`).join('');
     filterSel.value = data.countries.includes(prevF) ? prevF : '';
   }
   // 지출 추가 화면 드롭다운에서 바로 새 카테고리/국가를 추가할 수 있게 함 (설정 화면까지 갔다 올 필요 없이)
@@ -907,7 +1046,7 @@
     const usedCountries = new Set(data.expenses.map(e=>e.country));
     el('countryChips').innerHTML = data.countries.map(c => {
       const inUse = usedCountries.has(c);
-      return `<span class="chip">${escapeHtml(c)}${inUse ? '' : ` <button data-remove-country="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
+      return `<span class="chip">${countryFlag(c)} ${escapeHtml(c)}${inUse ? '' : ` <button data-remove-country="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
     }).join('');
 
     const usedCurrencies = new Set(data.expenses.map(e=>e.currency));
@@ -1007,7 +1146,7 @@
     panel.innerHTML = entries.map(e => {
       const color = tagColor(data.countries, e.name);
       return `<div class="cbar-row">
-        <div class="cbar-head"><b>${escapeHtml(e.name)}</b><span class="tabular">${won(e.amt)}</span></div>
+        <div class="cbar-head"><b>${countryFlag(e.name)} ${escapeHtml(e.name)}</b><span class="tabular">${won(e.amt)}</span></div>
         <div class="cbar-track"><div class="cbar-fill" style="width:${(e.amt/max*100).toFixed(1)}%; background:${color};"></div></div>
       </div>`;
     }).join('');
@@ -1070,6 +1209,108 @@
     return { label: `Day ${dayNum}`, isNumbered:true };
   }
 
+  // ---------- 여행 일정(일자별) ----------
+  function tripDateRange(trip){
+    if(!trip.startDate || !trip.endDate) return [];
+    const dates = [];
+    const cur = new Date(trip.startDate + 'T00:00:00');
+    const end = new Date(trip.endDate + 'T00:00:00');
+    if(isNaN(cur) || isNaN(end) || cur > end) return [];
+    const pad = n => String(n).padStart(2,'0');
+    while(cur <= end){
+      dates.push(`${cur.getFullYear()}-${pad(cur.getMonth()+1)}-${pad(cur.getDate())}`);
+      cur.setDate(cur.getDate()+1);
+    }
+    return dates;
+  }
+  function getOrCreateDay(tripId, dateStr){
+    let day = data.itineraryDays.find(d => d.tripId === tripId && d.date === dateStr);
+    if(!day){
+      day = { id: uid(), tripId, date: dateStr, items: [], photos: [], links: [] };
+      data.itineraryDays.push(day);
+    }
+    return day;
+  }
+  function shortenUrl(url){
+    try{
+      const u = new URL(url);
+      let s = u.hostname.replace(/^www\./,'') + u.pathname;
+      if(s.length > 30) s = s.slice(0,28) + '…';
+      return s;
+    }catch(e){
+      return url.length > 30 ? url.slice(0,28) + '…' : url;
+    }
+  }
+
+  function itineraryDayCardHtml(trip, dateStr){
+    const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
+    const info = dayInfo(trip, dateStr);
+    const items = day ? day.items.slice().sort((a,b)=>{
+      if(!a.time && !b.time) return 0;
+      if(!a.time) return 1;
+      if(!b.time) return -1;
+      return a.time.localeCompare(b.time);
+    }) : [];
+    const photos = day ? day.photos : [];
+    const links = day ? day.links : [];
+    const empty = !items.length && !photos.length && !links.length;
+
+    const itemsHtml = items.length ? `<div class="itin-items">${items.map(it => `
+      <div class="itin-item">
+        ${it.time ? `<span class="itin-time tabular">${escapeHtml(it.time)}</span>` : '<span class="itin-time itin-time-empty">·</span>'}
+        <span class="itin-text">${escapeHtml(it.text)}</span>
+        <button class="miniicon" data-del-item="${it.id}" data-day="${dateStr}" title="삭제">✕</button>
+      </div>`).join('')}</div>` : '';
+
+    const photosHtml = photos.length ? `<div class="itin-photos">${photos.map((p,i) => `
+      <div class="itin-photo">
+        <img src="${p}" data-itin-photo="${dateStr}" alt="사진">
+        <button class="itin-photo-del" data-del-photo-day="${dateStr}" data-del-photo-idx="${i}" title="삭제">✕</button>
+      </div>`).join('')}</div>` : '';
+
+    const linksHtml = links.length ? `<div class="itin-links">${links.map(l => `
+      <div class="itin-link">
+        <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">🔗 ${escapeHtml(shortenUrl(l.url))}</a>
+        <button class="itin-link-del" data-del-link-day="${dateStr}" data-del-link="${l.id}" title="삭제">✕</button>
+      </div>`).join('')}</div>` : '';
+
+    return `<div class="itin-daycard">
+      <div class="itin-daycard-head">
+        <span class="itin-daytitle">${info.isNumbered ? info.label : dateStr}</span>
+        <span class="itin-daydate">${dateStr.slice(5).replace('-','.')}</span>
+      </div>
+      ${empty ? '<div class="itin-empty-note">아직 등록된 일정이 없어요</div>' : ''}
+      ${itemsHtml}
+      ${photosHtml}
+      ${linksHtml}
+      <button type="button" class="itin-addbtn" data-add-day="${dateStr}">+ 일정 · 사진 · 링크 추가</button>
+    </div>`;
+  }
+
+  function renderItineraryTab(){
+    const trip = currentTrip();
+    const dates = tripDateRange(trip);
+    el('itineraryLabel').textContent = trip.name;
+    if(!dates.length){
+      el('itineraryEmptyState').style.display = 'block';
+      el('itineraryEmptyState').textContent = '여행 기간을 설정하면 하루하루 일정을 등록할 수 있어요. (⚙ 설정 → 현재 여행 설정에서 기간 입력)';
+      el('itineraryDays').innerHTML = '';
+      return;
+    }
+    el('itineraryEmptyState').style.display = 'none';
+    el('itineraryDays').innerHTML = dates.map(dateStr => itineraryDayCardHtml(trip, dateStr)).join('');
+  }
+
+  let activeMainTab = 'expense';
+  function switchMainTab(tab){
+    activeMainTab = tab;
+    el('expenseTabPanel').style.display = tab === 'expense' ? '' : 'none';
+    el('itineraryTabPanel').style.display = tab === 'itinerary' ? '' : 'none';
+    el('tabExpenseBtn').classList.toggle('active', tab === 'expense');
+    el('tabItineraryBtn').classList.toggle('active', tab === 'itinerary');
+    if(tab === 'itinerary') renderItineraryTab();
+  }
+
   let expandedRowIds = new Set();
   function rowHtml(e){
     const catColor = tagColor(data.categories, e.category);
@@ -1090,7 +1331,7 @@
           <span class="chev">▾</span>
         </div>
         <div class="expand">
-          <span class="country-badge">🌍 ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
+          <span class="country-badge">${countryFlag(e.country)} ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
           ${photoHtml}
           ${memoHtml}
           <div class="rowbtns">
@@ -1219,6 +1460,7 @@
     renderCountryPanel();
     renderTrendPanel();
     renderDayGroups();
+    if(activeMainTab === 'itinerary') renderItineraryTab();
   }
 
   // ---------- 토스트 ----------
@@ -1271,6 +1513,7 @@
     const trip = currentTrip();
     if(!confirm(`'${trip.name}' 여행과 그 안의 모든 지출 내역을 삭제합니다. 계속할까요?`)) return;
     data.expenses = data.expenses.filter(e => e.tripId !== trip.id);
+    data.itineraryDays = data.itineraryDays.filter(d => d.tripId !== trip.id);
     data.trips = data.trips.filter(t => t.id !== trip.id);
     data.currentTripId = data.trips[0].id;
     saveData(data);
@@ -1691,6 +1934,118 @@
   function closePhotoModal(){ el('photoModal').classList.remove('show'); el('photoOverlay').classList.remove('show'); }
   el('photoClose').addEventListener('click', closePhotoModal);
   el('photoOverlay').addEventListener('click', closePhotoModal);
+
+  // ---------- 메인 탭(지출/일정) ----------
+  el('tabExpenseBtn').addEventListener('click', () => switchMainTab('expense'));
+  el('tabItineraryBtn').addEventListener('click', () => switchMainTab('itinerary'));
+
+  // ---------- 여행 일정 추가 모달 ----------
+  let itinAddModalDate = null;
+  function openItinAddModal(dateStr){
+    itinAddModalDate = dateStr;
+    const trip = currentTrip();
+    const info = dayInfo(trip, dateStr);
+    el('itinAddModalTitle').textContent = `${info.isNumbered ? info.label + ' · ' : ''}${dateStr.slice(5).replace('-','.')} 일정 추가`;
+    el('itinNewTime').value = '';
+    el('itinNewText').value = '';
+    el('itinNewLink').value = '';
+    el('itinAddModal').classList.add('show');
+    el('itinAddOverlay').classList.add('show');
+  }
+  function closeItinAddModal(){
+    el('itinAddModal').classList.remove('show');
+    el('itinAddOverlay').classList.remove('show');
+    itinAddModalDate = null;
+  }
+  el('itinAddModalClose').addEventListener('click', closeItinAddModal);
+  el('itinAddOverlay').addEventListener('click', closeItinAddModal);
+
+  el('itinAddItemBtn').addEventListener('click', () => {
+    if(!itinAddModalDate) return;
+    const text = el('itinNewText').value.trim();
+    if(!text){ showToast('일정 내용을 입력해주세요'); return; }
+    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
+    day.items.push({ id: uid(), time: el('itinNewTime').value || '', text });
+    saveData(data);
+    el('itinNewTime').value = '';
+    el('itinNewText').value = '';
+    el('itinNewText').focus();
+    renderItineraryTab();
+    showToast('일정이 추가되었습니다');
+  });
+  el('itinNewText').addEventListener('keydown', e => { if(e.key === 'Enter') el('itinAddItemBtn').click(); });
+
+  el('itinPhotoBtn').addEventListener('click', () => el('itinPhotoFile').click());
+  el('itinPhotoFile').addEventListener('change', async (e) => {
+    if(!itinAddModalDate) return;
+    const files = Array.from(e.target.files || []);
+    if(!files.length) return;
+    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
+    for(const f of files){
+      const durl = await compressImage(f, 900);
+      if(durl) day.photos.push(durl);
+    }
+    saveData(data);
+    e.target.value = '';
+    renderItineraryTab();
+    showToast('사진이 추가되었습니다');
+  });
+
+  el('itinAddLinkBtn').addEventListener('click', () => {
+    if(!itinAddModalDate) return;
+    let url = el('itinNewLink').value.trim();
+    if(!url){ showToast('링크 주소를 입력해주세요'); return; }
+    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
+    day.links.push({ id: uid(), url });
+    saveData(data);
+    el('itinNewLink').value = '';
+    renderItineraryTab();
+    showToast('링크가 추가되었습니다');
+  });
+  el('itinNewLink').addEventListener('keydown', e => { if(e.key === 'Enter') el('itinAddLinkBtn').click(); });
+
+  el('itineraryDays').addEventListener('click', e => {
+    const addDayBtn = e.target.closest('[data-add-day]');
+    if(addDayBtn){ openItinAddModal(addDayBtn.dataset.addDay); return; }
+
+    const delItemBtn = e.target.closest('[data-del-item]');
+    if(delItemBtn){
+      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delItemBtn.dataset.day);
+      if(day){
+        day.items = day.items.filter(x => x.id !== delItemBtn.dataset.delItem);
+        saveData(data); renderItineraryTab();
+      }
+      return;
+    }
+
+    const delPhotoBtn = e.target.closest('[data-del-photo-day]');
+    if(delPhotoBtn){
+      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delPhotoBtn.dataset.delPhotoDay);
+      if(day){
+        day.photos.splice(Number(delPhotoBtn.dataset.delPhotoIdx), 1);
+        saveData(data); renderItineraryTab();
+      }
+      return;
+    }
+
+    const delLinkBtn = e.target.closest('[data-del-link]');
+    if(delLinkBtn){
+      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delLinkBtn.dataset.delLinkDay);
+      if(day){
+        day.links = day.links.filter(x => x.id !== delLinkBtn.dataset.delLink);
+        saveData(data); renderItineraryTab();
+      }
+      return;
+    }
+
+    const photoImg = e.target.closest('[data-itin-photo]');
+    if(photoImg){
+      el('photoModalImg').src = photoImg.src;
+      openPhotoModal();
+      return;
+    }
+  });
 
   // ---------- 지출 추가 (FAB + 모달) ----------
   function openAddExpenseModal(){
