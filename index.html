@@ -242,7 +242,8 @@
   .day-expamt{ flex-shrink:0; font-weight:700; }
 
   .day-route{ margin-bottom:10px; border-top:1px dashed var(--line2); padding-top:10px; }
-  .day-route-label{ font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
+  .day-route-label{ font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; cursor:pointer; list-style:revert; }
+  .day-route[open] .day-route-label{ margin-bottom:8px; }
   .route-item{ display:flex; align-items:baseline; gap:9px; padding:5px 2px; font-size:12px; }
   .route-time{ flex-shrink:0; width:92px; color:var(--ink3); font-size:11px; }
   .route-place{ flex:1; min-width:0; }
@@ -250,6 +251,20 @@
   .route-place a:hover{ color:var(--accent); }
   .route-activity{ color:var(--ink3); font-style:italic; }
   .route-warn{ cursor:help; }
+  .route-pending{ color:var(--ink3); font-style:italic; }
+
+  .spot-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:6px; }
+  .spot-chip{
+    display:flex; align-items:center; gap:8px; background:var(--bg); border:1px solid var(--line2);
+    border-radius:9px; padding:8px 10px; font-size:12.5px;
+  }
+  .spot-rank{ flex-shrink:0; font-weight:800; font-size:11px; color:var(--accent); width:14px; }
+  .spot-name{ flex:1; min-width:0; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .spot-unnamed{ color:var(--ink3); font-weight:600; font-style:italic; }
+  .spot-maplink{ flex-shrink:0; font-size:11px; color:var(--ink3); text-decoration:none; margin-left:-4px; }
+  .spot-maplink:hover{ color:var(--accent); }
+  .spot-dur{ flex-shrink:0; font-size:11.5px; color:var(--ink2); text-align:right; }
+  .spot-attrib{ font-size:10.5px; color:var(--ink3); margin:2px 0 10px; }
 
   .day-note-wrap{ margin-top:2px; }
   .day-note{
@@ -880,6 +895,7 @@
       expenses: [],
       itineraryDays: [],
       timelineByTrip: {},
+      placeNameCache: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -899,6 +915,7 @@
     if(!d.expenses) d.expenses = [];
     if(!d.itineraryDays) d.itineraryDays = [];
     if(!d.timelineByTrip) d.timelineByTrip = {};
+    if(!d.placeNameCache) d.placeNameCache = {};
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1294,19 +1311,28 @@
     return day;
   }
 
-  // ---------- 지출 기반 일자 요약 문장 자동 생성 ----------
-  function daySummaryText(exps){
-    if(!exps.length) return '';
-    const byCategory = {};
-    let total = 0;
-    exps.forEach(e => {
-      byCategory[e.category] = (byCategory[e.category]||0) + 1;
-      total += e.amountKrw;
-    });
-    const parts = Object.entries(byCategory).map(([cat,cnt]) => `${cat} ${cnt}건`);
+  // ---------- 지출 + 방문 스팟 기반 일자 요약 문장 자동 생성 ----------
+  function daySummaryText(exps, spots){
+    spots = spots || [];
+    const bodyParts = [];
+    if(spots.length){
+      const namedTop = spots.filter(s => s.label).slice(0,2).map(s => `${s.label} ${formatDuration(s.durationMin)}`);
+      bodyParts.push(`오늘 ${spots.length}곳 방문${namedTop.length ? `(${namedTop.join(', ')})` : ''}`);
+    }
+    if(exps.length){
+      const byCategory = {};
+      let total = 0;
+      exps.forEach(e => {
+        byCategory[e.category] = (byCategory[e.category]||0) + 1;
+        total += e.amountKrw;
+      });
+      const parts = Object.entries(byCategory).map(([cat,cnt]) => `${cat} ${cnt}건`);
+      bodyParts.push(`${parts.join(', ')} 지출 — 총 ${exps.length}건, ${won(total)} 사용`);
+    }
+    if(!bodyParts.length) return '';
     const countries = [...new Set(exps.map(e => e.country).filter(Boolean))];
     const flagLabel = countries.map(c => `${countryFlag(c)} ${c}`).join(', ');
-    return `${flagLabel ? flagLabel + '에서 ' : ''}${parts.join(', ')} 지출 — 총 ${exps.length}건, ${won(total)} 사용`;
+    return `${flagLabel ? flagLabel + '에서 ' : ''}${bodyParts.join(' · ')}`;
   }
 
   // ---------- 구글 타임라인 JSON 파싱 (시간대는 원본 문자열의 오프셋을 그대로 사용) ----------
@@ -1327,6 +1353,114 @@
     if(!m) return null;
     return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
   }
+  // ---------- 방문 스팟 분석: 체류시간 계산 / 인접 방문 병합 / 거리 계산 ----------
+  function minutesBetween(s, e){
+    if(!s || !e) return null;
+    const [sh,sm] = s.split(':').map(Number);
+    const [eh,em] = e.split(':').map(Number);
+    let diff = (eh*60+em) - (sh*60+sm);
+    if(diff < 0) diff += 1440;
+    return diff;
+  }
+  function formatDuration(min){
+    if(min == null) return '';
+    const h = Math.floor(min/60), m = min%60;
+    if(h && m) return `${h}시간 ${m}분`;
+    if(h) return `${h}시간`;
+    return `${m}분`;
+  }
+  function haversineMeters(lat1,lng1,lat2,lng2){
+    const R = 6371000;
+    const toRad = d => d * Math.PI/180;
+    const dphi = toRad(lat2-lat1), dl = toRad(lng2-lng1);
+    const a = Math.sin(dphi/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dl/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+  function rangesOverlap(s1,e1,s2,e2){ return s1 <= e2 && s2 <= e1; }
+  const SPOT_MIN_DURATION_MIN = 5;
+  const SPOT_MERGE_DIST_M = 200;
+
+  function computeDaySpots(trip, dateStr){
+    const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
+    if(!bucket) return [];
+    const visits = bucket.visits
+      .filter(v => v.date === dateStr && v.kind === 'visit' && v.lat != null && v.lng != null && v.startTime && v.endTime)
+      .map(v => ({ ...v, durationMin: minutesBetween(v.startTime, v.endTime) }))
+      .sort((a,b) => a.startTime.localeCompare(b.startTime));
+    const merged = [];
+    visits.forEach(v => {
+      const match = merged.find(m => rangesOverlap(m.startTime, m.endTime, v.startTime, v.endTime) && haversineMeters(m.lat, m.lng, v.lat, v.lng) <= SPOT_MERGE_DIST_M);
+      if(match){
+        if(v.startTime < match.startTime) match.startTime = v.startTime;
+        if(v.endTime > match.endTime) match.endTime = v.endTime;
+        match.durationMin = minutesBetween(match.startTime, match.endTime);
+        if(!match.label && v.label) match.label = v.label;
+      }else{
+        merged.push({ ...v });
+      }
+    });
+    const spots = merged.filter(v => v.durationMin >= SPOT_MIN_DURATION_MIN);
+    spots.forEach(v => { if(!v.label) v.label = cachedPlaceName(v.lat, v.lng); });
+    spots.sort((a,b) => b.durationMin - a.durationMin);
+    return spots;
+  }
+
+  // ---------- 방문 스팟 → 실제 장소명 (OpenStreetMap Nominatim 역지오코딩) ----------
+  function coordKey(lat, lng){ return `${lat.toFixed(4)},${lng.toFixed(4)}`; }
+  function cachedPlaceName(lat, lng){
+    if(lat == null || lng == null || !data.placeNameCache) return null;
+    const entry = data.placeNameCache[coordKey(lat, lng)];
+    return entry ? entry.name : null;
+  }
+  function hasCachedLookup(lat, lng){
+    if(lat == null || lng == null) return false;
+    return !!(data.placeNameCache && (coordKey(lat, lng) in data.placeNameCache));
+  }
+  async function fetchPlaceNameFromOSM(lat, lng){
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ko`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if(!res.ok) throw new Error('geocode-http-' + res.status);
+    const json = await res.json();
+    const addr = json.address || {};
+    const poi = json.name || addr.tourism || addr.attraction || addr.amenity || addr.shop || addr.leisure || addr.museum || addr.building || null;
+    if(poi) return { name: poi, precise: true };
+    if(addr.road) return { name: `${addr.road} 부근`, precise: false };
+    return { name: null, precise: false };
+  }
+  let geocodeChain = Promise.resolve();
+  const geocodeInFlight = new Set();
+  function enqueueGeocode(lat, lng){
+    if(lat == null || lng == null) return;
+    const key = coordKey(lat, lng);
+    if(hasCachedLookup(lat, lng) || geocodeInFlight.has(key)) return;
+    geocodeInFlight.add(key);
+    geocodeChain = geocodeChain
+      .then(() => new Promise(resolve => setTimeout(resolve, 1100))) // Nominatim 사용정책: 초당 1건 제한 준수
+      .then(() => fetchPlaceNameFromOSM(lat, lng))
+      .catch(() => null) // 네트워크 실패 시 캐시하지 않고 다음 기회에 재시도
+      .then(result => {
+        geocodeInFlight.delete(key);
+        if(result){
+          if(!data.placeNameCache) data.placeNameCache = {};
+          data.placeNameCache[key] = { name: result.name, precise: result.precise, resolvedAt: new Date().toISOString() };
+          saveData(data);
+          const typingInside = document.activeElement && document.activeElement.closest && document.activeElement.closest('#itineraryDays');
+          if(activeMainTab === 'itinerary' && !typingInside) renderItineraryTab();
+        }
+      });
+  }
+  function enqueueGeocodesForTrip(tripId){
+    const bucket = data.timelineByTrip && data.timelineByTrip[tripId];
+    if(!bucket) return;
+    const trip = data.trips.find(t => t.id === tripId);
+    if(!trip) return;
+    tripDateRange(trip).forEach(dateStr => {
+      computeDaySpots(trip, dateStr).forEach(spot => {
+        if(!spot.label) enqueueGeocode(spot.lat, spot.lng);
+      });
+    });
+  }
+
   const ACTIVITY_TYPE_LABELS = {
     IN_PASSENGER_VEHICLE:'자동차 이동', IN_VEHICLE:'차량 이동', IN_BUS:'버스 이동', IN_TRAIN:'기차 이동',
     IN_SUBWAY:'지하철 이동', IN_TRAM:'트램 이동', WALKING:'도보 이동', ON_FOOT:'도보 이동',
@@ -1411,13 +1545,18 @@
     let placeHtml;
     if(v.kind === 'activity'){
       placeHtml = `<span class="route-activity">${escapeHtml(v.label)}</span>`;
-    }else if(v.label){
-      placeHtml = escapeHtml(v.label);
-    }else if(v.lat != null && v.lng != null){
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
-      placeHtml = `<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">📍 ${v.lat.toFixed(4)}, ${v.lng.toFixed(4)} (지도에서 보기)</a>`;
     }else{
-      placeHtml = '알 수 없는 위치';
+      const resolvedName = v.label || cachedPlaceName(v.lat, v.lng);
+      if(resolvedName){
+        placeHtml = escapeHtml(resolvedName);
+      }else if(v.lat != null && v.lng != null){
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+        placeHtml = hasCachedLookup(v.lat, v.lng)
+          ? `<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">📍 ${v.lat.toFixed(4)}, ${v.lng.toFixed(4)} (지도에서 보기)</a>`
+          : `<span class="route-pending">위치 확인 중…</span> <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">(지도)</a>`;
+      }else{
+        placeHtml = '알 수 없는 위치';
+      }
     }
     return `<div class="route-item">
       <span class="route-time tabular">${timeLabel}${warn}</span>
@@ -1429,16 +1568,44 @@
     if(!bucket || !bucket.visits.length) return '';
     const dayVisits = bucket.visits.filter(v => v.date === dateStr).sort((a,b)=> (a.startTime||'').localeCompare(b.startTime||''));
     if(!dayVisits.length) return '';
-    return `<div class="day-route">
-      <div class="day-route-label">📍 이동 경로 (구글 타임라인)</div>
+    return `<details class="day-route">
+      <summary class="day-route-label">🧭 전체 이동 경로 상세보기</summary>
       ${dayVisits.map(v => routeItemHtml(v)).join('')}
-    </div>`;
+    </details>`;
+  }
+
+  // ---------- 방문 스팟 랭킹 리스트 (체류시간 순, 실제 장소명 반영) ----------
+  function daySpotListHtml(spots){
+    if(!spots.length) return '';
+    const rows = spots.map((v,i) => {
+      const dur = formatDuration(v.durationMin);
+      const timeRange = `${v.startTime}~${v.endTime}`;
+      let nameHtml;
+      if(v.label){
+        nameHtml = `<span class="spot-name">${escapeHtml(v.label)}</span>`;
+      }else if(hasCachedLookup(v.lat, v.lng)){
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+        nameHtml = `<span class="spot-name spot-unnamed">이름 미확인 장소</span><a class="spot-maplink" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">지도보기</a>`;
+      }else{
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+        nameHtml = `<span class="spot-name spot-unnamed">위치 확인 중…</span><a class="spot-maplink" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">지도보기</a>`;
+      }
+      return `<div class="spot-chip">
+        <span class="spot-rank">${i+1}</span>
+        ${nameHtml}
+        <span class="spot-dur tabular">${dur} · ${timeRange}</span>
+      </div>`;
+    }).join('');
+    return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (체류시간 순)</div>
+      <div class="spot-list">${rows}</div>
+      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자</div>`;
   }
 
   function itineraryDayCardHtml(trip, dateStr){
     const info = dayInfo(trip, dateStr);
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
-    const summary = daySummaryText(exps);
+    const spots = computeDaySpots(trip, dateStr);
+    const summary = daySummaryText(exps, spots);
     const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const note = day ? (day.note || '') : '';
 
@@ -1449,6 +1616,7 @@
         <span class="day-expamt tabular">${won(e.amountKrw)}</span>
       </div>`).join('')}</div>` : '<div class="itin-empty-note">이 날짜에 등록된 지출이 없어요</div>';
 
+    const spotListHtml = daySpotListHtml(spots);
     const routeHtml = dayTimelineHtml(trip, dateStr);
 
     return `<div class="itin-daycard">
@@ -1457,6 +1625,7 @@
         <span class="itin-daydate">${dateStr.slice(5).replace('-','.')}</span>
       </div>
       ${summary ? `<div class="day-summary">${escapeHtml(summary)}</div>` : ''}
+      ${spotListHtml}
       ${expenseListHtml}
       ${routeHtml}
       <div class="day-note-wrap">
@@ -1470,7 +1639,7 @@
     const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
     if(!bucket){
       return `<div class="timeline-upload-box">
-        <div class="timeline-upload-text">📍 구글 타임라인 파일을 업로드하면 이동 경로가 날짜별로 자동 정리돼요. (선택 사항)</div>
+        <div class="timeline-upload-text">📍 구글 타임라인 파일을 업로드하면 날짜별 방문 스팟(장소명·체류시간)이 자동 분석돼요. 장소명은 OpenStreetMap으로 조회합니다. (선택 사항)</div>
         <div class="timeline-upload-actions">
           <button type="button" class="addbtn" id="timelineUploadBtn">타임라인 업로드</button>
           <button type="button" class="miniicon" id="timelineHelpBtn">❓ 다운로드 방법</button>
@@ -1492,6 +1661,7 @@
     const dates = tripDateRange(trip);
     el('itineraryLabel').textContent = trip.name;
     el('timelineStatusBox').innerHTML = timelineStatusHtml(trip);
+    if(data.timelineByTrip && data.timelineByTrip[trip.id]) enqueueGeocodesForTrip(trip.id);
     if(!dates.length){
       el('itineraryEmptyState').style.display = 'block';
       el('itineraryEmptyState').textContent = '여행 기간을 설정하면 하루하루 요약이 자동으로 생성돼요. (⚙ 설정 → 현재 여행 설정에서 기간 입력)';
