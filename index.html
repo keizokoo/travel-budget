@@ -1391,6 +1391,18 @@
     return spots.slice().sort((a,b) => b.durationMin - a.durationMin).slice(0, n);
   }
 
+  // 좌표 하나의 "이름 품질"을 매긴다: 직접 수정 > 정확한 POI명 > 도로명 부근 > 조회했지만 이름 없음 > 아직 미조회.
+  // 병합된 여러 후보 좌표 중 어느 쪽을 대표로 보여줄지 고를 때 사용 — 그래야 "OO로 부근" 같은 애매한 이름
+  // 뒤에 실제로는 더 정확한 이름(예: 빅벤)이 조회된 좌표가 있어도 묻혀 사라지지 않는다.
+  function placeQuality(lat, lng){
+    if(lat == null || lng == null) return -1;
+    if(overrideName(lat, lng)) return 4;
+    const entry = data.placeNameCache && data.placeNameCache[coordKey(lat, lng)];
+    if(!entry) return 0;
+    if(entry.name && entry.precise) return 3;
+    if(entry.name) return 2;
+    return 1;
+  }
   function computeDaySpots(trip, dateStr){
     const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
     if(!bucket) return [];
@@ -1412,6 +1424,11 @@
         if(v.endTime > match.endTime) match.endTime = v.endTime;
         match.durationMin = minutesBetween(match.startTime, match.endTime);
         if(!match.label && v.label) match.label = v.label;
+        // 병합된 후보 좌표 중 이름 품질이 더 좋은 쪽을 대표 좌표로 승격한다.
+        if(placeQuality(v.lat, v.lng) > placeQuality(match.lat, match.lng)){
+          match.lat = v.lat;
+          match.lng = v.lng;
+        }
       }else{
         merged.push({ ...v });
       }
