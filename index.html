@@ -1463,6 +1463,8 @@
   }
   let geocodeChain = Promise.resolve();
   const geocodeInFlight = new Set();
+  const geocodeRetryCount = {};
+  const GEOCODE_MAX_RETRIES = 5;
   function enqueueGeocode(lat, lng){
     if(lat == null || lng == null) return;
     const key = coordKey(lat, lng);
@@ -1471,29 +1473,44 @@
     geocodeChain = geocodeChain
       .then(() => new Promise(resolve => setTimeout(resolve, 1100))) // Nominatim 사용정책: 초당 1건 제한 준수
       .then(() => fetchPlaceNameFromOSM(lat, lng))
-      .catch(() => null) // 네트워크 실패 시 캐시하지 않고 다음 기회에 재시도
       .then(result => {
         geocodeInFlight.delete(key);
-        if(result){
-          if(!data.placeNameCache) data.placeNameCache = {};
-          data.placeNameCache[key] = { name: result.name, precise: result.precise, resolvedAt: new Date().toISOString() };
-          saveData(data);
-          // 메모(textarea) 입력 중에만 다시그리기를 미룬다. "전체 이동 경로 상세보기" 같은 <details>를
-          // 펼쳐서 포커스가 가 있는 경우까지 막으면, 그 상태로 도착한 장소명이 화면에 영영 반영되지 않는다.
-          const typingInside = document.activeElement && document.activeElement.tagName === 'TEXTAREA'
-            && document.activeElement.closest && document.activeElement.closest('#itineraryDays');
-          if(activeMainTab === 'itinerary' && !typingInside) renderItineraryTab();
+        delete geocodeRetryCount[key];
+        if(!data.placeNameCache) data.placeNameCache = {};
+        data.placeNameCache[key] = { name: result.name, precise: result.precise, resolvedAt: new Date().toISOString() };
+        saveData(data);
+        // 메모(textarea) 입력 중에만 다시그리기를 미룬다. "전체 이동 경로 상세보기" 같은 <details>를
+        // 펼쳐서 포커스가 가 있는 경우까지 막으면, 그 상태로 도착한 장소명이 화면에 영영 반영되지 않는다.
+        const typingInside = document.activeElement && document.activeElement.tagName === 'TEXTAREA'
+          && document.activeElement.closest && document.activeElement.closest('#itineraryDays');
+        if(activeMainTab === 'itinerary' && !typingInside) renderItineraryTab();
+      })
+      .catch(() => {
+        // 네트워크 실패(모바일 전파 끊김, Nominatim 일시적 속도제한 등)는 캐시하지 않고, 잠시 후 자동 재시도한다.
+        // 사용자가 화면을 계속 보고 있어도(탭 전환 없이) 스스로 회복되도록 지수 백오프로 최대 5회 재시도하고,
+        // 그래도 안 되면 다음에 탭을 다시 열거나 타임라인을 재업로드할 때 다시 시도된다(완전 포기하지 않음).
+        geocodeInFlight.delete(key);
+        const attempts = (geocodeRetryCount[key] || 0) + 1;
+        geocodeRetryCount[key] = attempts;
+        if(attempts <= GEOCODE_MAX_RETRIES){
+          const delay = Math.min(20000, 2000 * attempts);
+          setTimeout(() => enqueueGeocode(lat, lng), delay);
         }
       });
   }
   function enqueueGeocodesForTrip(tripId){
     const bucket = data.timelineByTrip && data.timelineByTrip[tripId];
     if(!bucket) return;
-    // 병합된 "오늘 방문한 곳" 목록 좌표뿐 아니라, 전체 이동 경로 상세보기에 표시되는
-    // 개별 방문 기록의 좌표도 전부 큐에 넣는다. 그렇지 않으면 병합 과정에서 대표 좌표로
-    // 선택되지 못한 방문 기록은 영원히 "위치 확인 중…" 상태로 남게 된다.
+    const trip = data.trips.find(t => t.id === tripId);
+    if(!trip) return;
+    // 구글 타임라인 파일은 보통 이 여행 기간뿐 아니라 그 사람의 전체 위치 기록(수개월~수년치)을
+    // 담고 있다. 여행 기간으로 좁히지 않고 bucket.visits 전체를 큐에 넣으면, 정작 화면에 보이는
+    // 여행 기간의 좌표가 무관한 과거 기록 수백~수천 건 뒤에 밀려 몇 시간이 지나도 조회되지 않는
+    // 문제가 생긴다(초당 1건 제한 때문). 반드시 여행 기간 내 날짜로 먼저 좁힌 뒤, 그 안의 모든
+    // 개별 방문 기록(병합 대표 좌표로 뽑히지 못한 것 포함)을 큐에 넣는다.
+    const tripDates = new Set(tripDateRange(trip));
     bucket.visits.forEach(v => {
-      if(v.kind === 'visit' && v.lat != null && v.lng != null && !v.label){
+      if(v.kind === 'visit' && v.lat != null && v.lng != null && !v.label && tripDates.has(v.date)){
         enqueueGeocode(v.lat, v.lng);
       }
     });
