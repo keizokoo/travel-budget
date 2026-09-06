@@ -177,6 +177,11 @@
     font-size:12.5px; font-weight:700; color:var(--ink2);
     background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
   }
+  .erow .pay-badge{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:12.5px; font-weight:700; color:var(--ink2);
+    background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
+  }
   .miniicon{ background:none; border:none; color:var(--ink2); font-size:12px; padding:2px 3px; border-radius:6px; }
   .miniicon:hover{ color:var(--ink); background:var(--line); }
   .erow .expand .memo{ font-size:11px; color:var(--ink2); width:100%; }
@@ -200,6 +205,14 @@
   .erow.editmode .rowbtns .miniicon.save-btn:hover{ background:var(--good); opacity:.9; }
   .erow.editmode .rowbtns .miniicon.cancel-btn{ background:var(--bg); border:1px solid var(--line2); color:var(--ink2); }
   .erow.editmode .rowbtns .miniicon.cancel-btn:hover{ background:var(--line); color:var(--ink); }
+  .editmode-photo-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .editmode-photo-row .editmode-photo-thumb{ height:44px; border-radius:6px; border:1px solid var(--line2); cursor:pointer; display:block; }
+  .editmode-photo-row .editmode-photo-empty{ font-size:11.5px; color:var(--ink3); }
+  .editmode-photo-row .miniicon{
+    font-size:12px; font-weight:700; padding:6px 10px; border-radius:7px; background:var(--bg); border:1px solid var(--line2); color:var(--ink2);
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .editmode-photo-row .miniicon:hover{ background:var(--line); color:var(--ink); }
 
   .empty{ text-align:center; padding:34px 10px; color:var(--ink2); font-size:13px; }
 
@@ -305,6 +318,15 @@
     width:38px; height:36px; flex-shrink:0; font-size:16px; display:flex; align-items:center; justify-content:center; padding:0;
   }
   .receiptbtn.has-photo{ border-color:var(--good); color:var(--good); }
+  .paymethod-row{ display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+  .paymethod-btn{
+    border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
+    padding:8px 12px; font-size:12.5px; font-weight:700; flex:1;
+  }
+  .paymethod-btn.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+  .paymethod-row select{
+    flex:1 1 100%; border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink);
+  }
   @media (max-width:640px){
     .addrow-grid1{ grid-template-columns:1fr 1fr; }
   }
@@ -564,6 +586,11 @@
             <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
             <button type="button" class="receiptbtn" id="newReceiptBtn" title="영수증 사진 추가">📷</button>
           </div>
+          <div class="paymethod-row" id="paymethodToggle">
+            <button type="button" class="paymethod-btn active" data-pay="cash">💵 현금</button>
+            <button type="button" class="paymethod-btn" data-pay="card">💳 카드</button>
+            <select id="newCardType" style="display:none;"></select>
+          </div>
           <div class="fxrow" id="fxRow">
             <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
             <div class="tabular" id="fxPreview" style="font-size:12.5px; color:var(--ink2); align-self:center;"></div>
@@ -699,6 +726,16 @@
     </div>
 
     <div class="block">
+      <h4>카드 구분 관리</h4>
+      <div class="chiprow" id="cardTypeChips"></div>
+      <div class="addchip">
+        <input type="text" id="newCardTypeInput" placeholder="새 카드 구분 (예: 법인카드)">
+        <button id="addCardTypeBtn">추가</button>
+      </div>
+      <p class="note" style="margin-top:8px;">지출 추가 시 결제수단을 "카드"로 선택하면 여기서 등록한 카드 구분 중 하나를 고를 수 있습니다.</p>
+    </div>
+
+    <div class="block">
       <h4>환율 관리</h4>
       <p class="note" style="margin-bottom:10px;">여기서 저장해두면 해당 통화로 지출을 추가하거나 카드승인 문자를 인식할 때 환율이 자동으로 채워집니다.</p>
       <div id="fxRatePanel"></div>
@@ -799,6 +836,7 @@
   const DEFAULT_CATEGORIES = ["식사","숙소","교통","기타"];
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
+  const DEFAULT_CARD_TYPES = ["MG","원더","비즈"];
 
   const TAG_COLOR_PALETTE = ["#C1440E","#2F6FE0","#1F8A6B","#9B5CF0","#B08900","#5B7A99","#C1447A"];
   function tagColor(list, name){
@@ -843,6 +881,7 @@
       categories: DEFAULT_CATEGORIES.slice(),
       countries: DEFAULT_COUNTRIES.slice(),
       currencies: DEFAULT_CURRENCIES.slice(),
+      cardTypes: DEFAULT_CARD_TYPES.slice(),
       trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "", budget: 0 }],
       currentTripId: tripId,
       expenses: [],
@@ -856,6 +895,7 @@
     if(!d.categories || !d.categories.length) d.categories = DEFAULT_CATEGORIES.slice();
     if(!d.countries || !d.countries.length) d.countries = DEFAULT_COUNTRIES.slice();
     if(!d.currencies || !d.currencies.length) d.currencies = DEFAULT_CURRENCIES.slice();
+    if(!d.cardTypes || !d.cardTypes.length) d.cardTypes = DEFAULT_CARD_TYPES.slice();
     if(!d.trips || !d.trips.length){
       const tripId = uid();
       d.trips = [{ id: tripId, name: "새 여행", startDate: "", endDate: "", budget: 0 }];
@@ -966,6 +1006,27 @@
     sel.value = data.currencies.includes(prev) ? prev : 'KRW';
     toggleFxRow();
   }
+  // ---------- 결제수단(현금/카드) ----------
+  function renderCardTypeOptions(){
+    const sel = el('newCardType');
+    const prev = sel.value;
+    sel.innerHTML = data.cardTypes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if(data.cardTypes.includes(prev)) sel.value = prev;
+  }
+  function setPaymentMethod(method){
+    const toggle = el('paymethodToggle');
+    toggle.querySelectorAll('.paymethod-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
+    el('newCardType').style.display = (method === 'card') ? '' : 'none';
+  }
+  function getPaymentMethod(){
+    const activeBtn = el('paymethodToggle').querySelector('.paymethod-btn.active');
+    return activeBtn ? activeBtn.dataset.pay : 'cash';
+  }
+  el('paymethodToggle').addEventListener('click', e => {
+    const btn = e.target.closest('[data-pay]');
+    if(!btn) return;
+    setPaymentMethod(btn.dataset.pay);
+  });
   function toggleFxRow(){
     const cur = el('newCurrency').value;
     const isForeign = cur && cur !== 'KRW';
@@ -1053,6 +1114,12 @@
     el('currencyChips').innerHTML = data.currencies.map(c => {
       const inUse = usedCurrencies.has(c) || c === 'KRW';
       return `<span class="chip">${escapeHtml(c)}${inUse ? '' : ` <button data-remove-currency="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
+    }).join('');
+
+    const usedCardTypes = new Set(data.expenses.filter(e=>e.paymentMethod==='card').map(e=>e.cardType));
+    el('cardTypeChips').innerHTML = data.cardTypes.map(c => {
+      const inUse = usedCardTypes.has(c);
+      return `<span class="chip">💳 ${escapeHtml(c)}${inUse ? '' : ` <button data-remove-cardtype="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
     }).join('');
 
     renderFxRatePanel();
@@ -1317,6 +1384,8 @@
     const fxHtml = e.currency !== 'KRW' ? `<span class="fx">${Number(e.amountForeign).toLocaleString('ko-KR')} ${e.currency}</span>` : '';
     const memoHtml = e.memo ? `<div class="memo">📝 ${escapeHtml(e.memo)}</div>` : '';
     const photoHtml = e.receipt ? `<div class="receipt-thumb"><img src="${e.receipt}" data-photo="${e.id}" alt="영수증"></div>` : '';
+    const payHtml = e.paymentMethod === 'card' ? `<span class="pay-badge">💳 카드${e.cardType ? ' · '+escapeHtml(e.cardType) : ''}</span>`
+      : e.paymentMethod === 'cash' ? `<span class="pay-badge">💵 현금</span>` : '';
     const hasExtra = !!(e.memo || e.receipt);
     const expanded = expandedRowIds.has(e.id);
     return `<div class="erow ${expanded ? '' : 'collapsed'}" data-id="${e.id}">
@@ -1332,6 +1401,7 @@
         </div>
         <div class="expand">
           <span class="country-badge">${countryFlag(e.country)} ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
+          ${payHtml}
           ${photoHtml}
           ${memoHtml}
           <div class="rowbtns">
@@ -1426,6 +1496,7 @@
     renderCategoryOptions();
     renderCountryOptions();
     renderCurrencyOptions();
+    renderCardTypeOptions();
     renderChips();
     renderItemSuggestions();
     renderStorageUsage();
@@ -1683,6 +1754,62 @@
     return ocrWorkerPromise;
   }
 
+  // ---------- 사진 방향 자동 보정 (옆으로 눕혀 찍은 영수증 사진 인식 개선) ----------
+  // 휴대폰으로 영수증을 가로로 눕혀 찍으면(세로로 긴 영수증을 한 장에 담으려고 회전해서 촬영하는 경우가 흔함)
+  // OCR이 글자를 인식하지 못하거나 엉뚱한 숫자를 읽어내는 문제가 있어, 0/90/180/270도로 각각 인식을 시도해
+  // 가장 신뢰도(confidence)가 높은 방향의 결과를 사용한다.
+  function loadImageEl(file){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { resolve(img); URL.revokeObjectURL(url); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image-load-fail')); };
+      img.src = url;
+    });
+  }
+  function rotateImageToCanvas(img, degrees, maxW){
+    const swap = (degrees === 90 || degrees === 270);
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if(maxW && Math.max(w, h) > maxW){
+      const scale = maxW / Math.max(w, h);
+      w = Math.round(w * scale); h = Math.round(h * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = swap ? h : w;
+    canvas.height = swap ? w : h;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(degrees * Math.PI / 180);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    return canvas;
+  }
+  async function recognizeTextFromImage(file){
+    const worker = await getOcrWorker();
+    let img;
+    try{ img = await loadImageEl(file); }catch(e){
+      // 이미지 디코딩 자체가 안 되면(드묾) 원본 파일로 바로 인식 시도
+      const { data } = await worker.recognize(file);
+      return data.text;
+    }
+    // 1차: 4방향을 축소본으로 빠르게 인식해 신뢰도가 가장 높은 방향을 찾는다
+    const rotations = [0, 90, 180, 270];
+    let bestDeg = 0, bestScore = -1;
+    for(const deg of rotations){
+      try{
+        const smallCanvas = rotateImageToCanvas(img, deg, 500);
+        const { data } = await worker.recognize(smallCanvas);
+        const score = typeof data.confidence === 'number' ? data.confidence : 0;
+        if(score > bestScore){ bestScore = score; bestDeg = deg; }
+        if(score >= 85) break; // 이미 충분히 확실하면 나머지 방향은 생략(속도)
+      }catch(e){ /* 이 방향은 실패 - 다음 방향 계속 시도 */ }
+    }
+    // 2차: 가장 가능성 높은 방향으로 원본 해상도에 가깝게 다시 인식(정확도)
+    const finalCanvas = rotateImageToCanvas(img, bestDeg, 1600);
+    const { data } = await worker.recognize(finalCanvas);
+    return data.text;
+  }
+
   // 카드 승인문자/알림 캡처가 아닌 일반 영수증 사진일 때의 보조 파서 (best-effort)
   function parseReceiptText(text){
     const t = (text || '').replace(/\r/g, '');
@@ -1695,14 +1822,25 @@
     else if(/[₩]|KRW|원(?!\S)/.test(t)) currency = 'KRW';
     else if(/USD|\$/.test(t)) currency = 'USD';
 
-    // "합계/총액/TOTAL" 라벨 근처 금액 우선, 없으면 통화기호가 붙은 숫자 중 최댓값
+    // "합계/총액/TOTAL" 라벨 근처 금액 우선 — "SUBTOTAL"의 부분일치(total)는 제외하고,
+    // 같은 라벨이 여러 번 나오면(소계→서비스료→총액 순 등) 마지막에 나오는 것을 최종 합계로 신뢰한다.
     let amount = null;
-    const labelMatch = t.match(/(합계|총액|total|amount due|grand\s*total)[^\d]{0,15}([\d][\d,\.]*)/i);
-    if(labelMatch){ amount = parseFloat(labelMatch[2].replace(/,/g,'')); }
+    const labelRe = /(?<!sub)(합계|총액|total\s*due|grand\s*total|amount\s*due|total)[^\d\n]{0,40}([\d][\d,\.]*)/gi;
+    const labelMatches = [...t.matchAll(labelRe)];
+    if(labelMatches.length){ amount = parseFloat(labelMatches[labelMatches.length-1][2].replace(/,/g,'')); }
     if(!amount){
-      const nums = [...t.matchAll(/[£€$₩]?\s*([\d]{1,3}(?:[,\.]\d{3})*(?:\.\d{1,2})?)\s*(?:원)?/g)]
-        .map(x => parseFloat(x[1].replace(/,/g,'')))
-        .filter(n => !isNaN(n) && n > 0);
+      // 라벨을 못 찾은 경우의 보조 추정: 퍼센트(할인율/서비스요율)나 "#"로 시작하는
+      // 일련번호·테이블번호·인원수 등은 금액이 아니므로 제외하고, 남은 숫자 중 최댓값을 사용
+      const nums = [];
+      const numRe = /[£€$₩]?\s*(\d{1,3}(?:[,\.]\d{3})*(?:\.\d{1,2})?)\s*(원|%)?/g;
+      let nm;
+      while((nm = numRe.exec(t))){
+        if(nm[2] === '%') continue;
+        const before = t.slice(Math.max(0, nm.index - 3), nm.index);
+        if(/#\s*$/.test(before)) continue;
+        const val = parseFloat(nm[1].replace(/,/g,''));
+        if(!isNaN(val) && val > 0) nums.push(val);
+      }
       if(nums.length) amount = Math.max(...nums);
     }
 
@@ -1719,13 +1857,26 @@
       }
     }
 
-    // 상호명 추정: 숫자/기호로만 이루어지지 않은 첫 줄
+    // 상호명 추정: "DINING/STORE/상호/매장" 라벨이 있으면 우선 사용,
+    // 없으면 체크·테이블번호/날짜/시간/합계 등 메타정보 줄을 제외한 첫 줄을 사용
     let item = '';
     const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
     for(const line of lines){
-      if(line.length >= 2 && /[a-zA-Z가-힣]/.test(line) && !/^(합계|총액|total|receipt|영수증)/i.test(line)){
-        item = line.slice(0, 40);
-        break;
+      const labelMatch = line.match(/(?:dining|store|shop|상호|매장)\s*[:\-]\s*(.+)/i);
+      if(labelMatch && labelMatch[1].trim()){
+        // 앞뒤에 붙은 장식용 기호(--, **, ==  등)는 제거
+        const cleaned = labelMatch[1].trim().replace(/^[\s\-*_=~]+|[\s\-*_=~]+$/g, '').trim();
+        if(cleaned){ item = cleaned.slice(0, 40); break; }
+      }
+    }
+    if(!item){
+      for(const line of lines){
+        if(/^(check|table|date|time|order|receipt|영수증|합계|총액|total|subtotal|service|rate|net|tax|gross)\b/i.test(line)) continue;
+        if((line.match(/\d/g) || []).length >= 4) continue; // 숫자가 많은 줄(일련번호/날짜/시간)은 상호명이 아닐 가능성이 높음
+        if(line.length >= 2 && /[a-zA-Z가-힣]/.test(line)){
+          item = line.replace(/^[\s\-*_=~]+|[\s\-*_=~]+$/g, '').trim().slice(0, 40);
+          break;
+        }
       }
     }
 
@@ -1738,12 +1889,11 @@
     const btn = el('photoRecognizeBtn');
     btn.disabled = true;
     const originalLabel = btn.textContent;
-    btn.textContent = '🔎 인식 중... (몇 초 소요)';
+    btn.textContent = '🔎 인식 중... (사진 방향 자동 확인, 5~10초 소요)';
     note.textContent = '';
     note.classList.remove('warn');
     try{
-      const worker = await getOcrWorker();
-      const { data: { text } } = await worker.recognize(file);
+      const text = await recognizeTextFromImage(file);
 
       // 카드 승인문자 파서는 금액까지 실제로 찾았을 때만 신뢰 (날짜/항목만 억지로 맞춘 오탐 방지)
       let parsed = parseSmsExpense(text);
@@ -1793,6 +1943,8 @@
     const fxRate = Number(el('newFxRate').value);
     const item = el('newItem').value.trim();
     const memo = el('newMemo').value.trim();
+    const paymentMethod = getPaymentMethod();
+    const cardType = paymentMethod === 'card' ? el('newCardType').value : null;
 
     if(!date){ showToast('날짜를 선택해주세요'); return; }
     if(category === '__addnew__'){ showToast('카테고리를 선택해주세요'); return; }
@@ -1800,12 +1952,14 @@
     if(!item){ showToast('지출 항목을 입력해주세요'); return; }
     if(!amount || amount <= 0){ showToast('금액을 입력해주세요'); return; }
     if(currency !== 'KRW' && (!fxRate || fxRate <= 0)){ showToast('환율을 입력해주세요'); return; }
+    if(paymentMethod === 'card' && !cardType){ showToast('카드 구분을 선택해주세요'); return; }
 
     const amountKrw = computeKrw(currency, amount, fxRate);
     data.expenses.push({
       id: uid(), tripId: data.currentTripId, date, category, country, city,
       currency, amountForeign: currency === 'KRW' ? null : amount,
-      amountKrw, item, memo, receipt: pendingReceiptDataUrl
+      amountKrw, item, memo, receipt: pendingReceiptDataUrl,
+      paymentMethod, cardType
     });
     if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
     saveData(data);
@@ -1815,6 +1969,7 @@
     el('photoRecognizeNote').textContent=''; el('photoRecognizeNote').classList.remove('warn');
     pendingReceiptDataUrl = null;
     el('newReceiptBtn').title = '영수증 사진 추가'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
+    setPaymentMethod('cash');
     updateFxPreview();
     render();
     closeAddExpenseModal();
@@ -1893,6 +2048,11 @@
     swipeState = null;
   });
 
+  function editPhotoRowHtml(dataUrl){
+    return `${dataUrl ? `<img class="editmode-photo-thumb" data-preview-photo src="${dataUrl}" alt="영수증">` : '<span class="editmode-photo-empty">영수증 사진 없음</span>'}
+      <button type="button" class="miniicon" data-receipt-pick>📷 ${dataUrl ? '변경' : '추가'}</button>
+      ${dataUrl ? '<button type="button" class="miniicon" data-receipt-remove>🗑 제거</button>' : ''}`;
+  }
   function enterEditMode(id){
     const exp = data.expenses.find(x=>x.id===id);
     if(!exp) return;
@@ -1900,6 +2060,9 @@
     if(!row) return;
     const catOptions = data.categories.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.category?'selected':''}>${escapeHtml(c)}</option>`).join('');
     const countryOptions = data.countries.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.country?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    const payMethod = exp.paymentMethod || 'cash';
+    const cardTypeOptions = data.cardTypes.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.cardType?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    let editReceiptDataUrl = exp.receipt || null;
     row.classList.add('editmode');
     row.innerHTML = `
       <input type="date" value="${exp.date}" data-f="date">
@@ -1907,11 +2070,36 @@
       <select data-f="country">${countryOptions}</select>
       <input type="text" value="${escapeHtml(exp.item)}" data-f="item" placeholder="지출 항목">
       <input type="number" value="${exp.amountKrw}" data-f="amountKrw" min="0" step="100" placeholder="원화 금액">
+      <select data-f="paymentMethod">
+        <option value="cash" ${payMethod==='cash'?'selected':''}>💵 현금</option>
+        <option value="card" ${payMethod==='card'?'selected':''}>💳 카드</option>
+      </select>
+      <select data-f="cardType" style="${payMethod==='card'?'':'display:none;'}">${cardTypeOptions}</select>
+      <div class="editmode-photo-row" data-photo-row>${editPhotoRowHtml(editReceiptDataUrl)}</div>
+      <input type="file" accept="image/*" data-f="receiptFile" style="display:none;">
       <div class="rowbtns">
         <button class="miniicon save-btn" data-save="${id}" title="저장">✔ 저장</button>
         <button class="miniicon cancel-btn" data-cancel="${id}" title="취소">✕ 취소</button>
       </div>
       <input type="text" value="${escapeHtml(exp.memo||'')}" data-f="memo" placeholder="메모 (선택)">`;
+    row.querySelector('[data-f="paymentMethod"]').addEventListener('change', e => {
+      row.querySelector('[data-f="cardType"]').style.display = (e.target.value === 'card') ? '' : 'none';
+    });
+    const photoRow = row.querySelector('[data-photo-row]');
+    const receiptFileInput = row.querySelector('[data-f="receiptFile"]');
+    function refreshPhotoRow(){ photoRow.innerHTML = editPhotoRowHtml(editReceiptDataUrl); }
+    photoRow.addEventListener('click', e => {
+      if(e.target.closest('[data-receipt-pick]')){ receiptFileInput.click(); return; }
+      if(e.target.closest('[data-receipt-remove]')){ editReceiptDataUrl = null; refreshPhotoRow(); return; }
+      if(e.target.closest('[data-preview-photo]')){ el('photoModalImg').src = editReceiptDataUrl; openPhotoModal(); return; }
+    });
+    receiptFileInput.addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if(!file) return;
+      editReceiptDataUrl = await compressImage(file, 900);
+      refreshPhotoRow();
+      e.target.value = '';
+    });
     row.querySelector('[data-save]').addEventListener('click', () => {
       const date = row.querySelector('[data-f="date"]').value;
       const category = row.querySelector('[data-f="category"]').value;
@@ -1919,8 +2107,12 @@
       const item = row.querySelector('[data-f="item"]').value.trim();
       const amountKrw = Number(row.querySelector('[data-f="amountKrw"]').value);
       const memo = row.querySelector('[data-f="memo"]').value.trim();
+      const paymentMethod = row.querySelector('[data-f="paymentMethod"]').value;
+      const cardType = paymentMethod === 'card' ? row.querySelector('[data-f="cardType"]').value : null;
       if(!date || !item || !amountKrw || amountKrw<=0){ showToast('입력값을 확인해주세요'); return; }
       exp.date = date; exp.category = category; exp.country = country; exp.item = item; exp.amountKrw = amountKrw; exp.memo = memo;
+      exp.paymentMethod = paymentMethod; exp.cardType = cardType;
+      exp.receipt = editReceiptDataUrl;
       // 원화로 직접 수정한 경우 외화 원본표기는 참고용으로 남겨두되 금액 기준은 원화로 통일
       saveData(data);
       render();
@@ -2099,8 +2291,7 @@
     };
     try{ draft.receipt = await compressImage(file, 900); }catch(e){}
     try{
-      const worker = await getOcrWorker();
-      const { data: { text } } = await worker.recognize(file);
+      const text = await recognizeTextFromImage(file);
       let parsed = parseSmsExpense(text);
       let usable = parsed && (parsed.krwAmount || parsed.foreignAmount);
       if(!usable){
@@ -2281,6 +2472,21 @@
     data.currencies = data.currencies.filter(c=>c!==name);
     saveData(data); render();
   });
+  el('addCardTypeBtn').addEventListener('click', () => {
+    const input = el('newCardTypeInput');
+    const name = input.value.trim();
+    if(!name) return;
+    if(data.cardTypes.includes(name)){ showToast('이미 있는 카드 구분입니다'); return; }
+    data.cardTypes.push(name);
+    saveData(data); input.value=''; render();
+    showToast(`'${name}' 카드 구분이 추가되었습니다`);
+  });
+  el('cardTypeChips').addEventListener('click', e => {
+    const name = e.target.dataset.removeCardtype;
+    if(!name) return;
+    data.cardTypes = data.cardTypes.filter(c=>c!==name);
+    saveData(data); render();
+  });
   el('fxRatePanel').addEventListener('click', e => {
     const cur = e.target.dataset.saveFxrate;
     if(!cur) return;
@@ -2302,7 +2508,7 @@
       e.target.closest('.fxrate-row').querySelector('[data-save-fxrate]').click();
     }
   });
-  [['newCategoryInput','addCategoryBtn'], ['newCountryInput','addCountryBtn'], ['newCurrencyInput','addCurrencyBtn']].forEach(([inputId, btnId]) => {
+  [['newCategoryInput','addCategoryBtn'], ['newCountryInput','addCountryBtn'], ['newCurrencyInput','addCurrencyBtn'], ['newCardTypeInput','addCardTypeBtn']].forEach(([inputId, btnId]) => {
     el(inputId).addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); el(btnId).click(); } });
   });
 
@@ -2485,9 +2691,10 @@
 
   // ---------- CSV 내보내기 ----------
   function doCsvExport(){
-    const rows = [['날짜','카테고리','국가','도시','항목','메모','통화','외화금액','원화금액']];
+    const rows = [['날짜','카테고리','국가','도시','항목','메모','통화','외화금액','원화금액','결제수단','카드구분']];
     tripExpenses(data.currentTripId).forEach(e => {
-      rows.push([e.date, e.category, e.country, e.city||'', e.item, e.memo||'', e.currency, e.amountForeign||'', e.amountKrw]);
+      const payLabel = e.paymentMethod === 'card' ? '카드' : e.paymentMethod === 'cash' ? '현금' : '';
+      rows.push([e.date, e.category, e.country, e.city||'', e.item, e.memo||'', e.currency, e.amountForeign||'', e.amountKrw, payLabel, e.cardType||'']);
     });
     const csv = rows.map(r => r.map(v => {
       const s = String(v);
