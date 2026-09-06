@@ -220,7 +220,7 @@
     padding:14px 14px 12px; box-shadow:var(--shadow);
   }
   .addrow-grid1{ display:grid; grid-template-columns:120px 100px 100px 1fr; gap:8px; margin-bottom:8px; }
-  .addrow-grid2{ display:grid; grid-template-columns:90px 90px 1fr 120px auto; gap:8px; align-items:center; }
+  .addrow-grid2{ display:grid; grid-template-columns:120px 1fr; gap:8px; align-items:center; margin-bottom:8px; }
   .addrow-card input, .addrow-card select{
     border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink); width:100%;
   }
@@ -233,21 +233,15 @@
   }
   .addrow-card .memorow{ display:flex; gap:8px; margin-top:8px; }
   .addrow-card .memorow input{ flex:1; }
+  .item-receipt-row{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+  .item-receipt-row input{ flex:1; min-width:0; }
   .receiptbtn{
     border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
-    padding:8px 10px; font-size:12px; font-weight:600; white-space:nowrap; flex-shrink:0;
+    width:38px; height:36px; flex-shrink:0; font-size:16px; display:flex; align-items:center; justify-content:center; padding:0;
   }
   .receiptbtn.has-photo{ border-color:var(--good); color:var(--good); }
-  .quickitems-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-  .quickitem-chip{
-    background:var(--bg); border:1px solid var(--line2); color:var(--ink2); border-radius:999px;
-    padding:5px 12px; font-size:12px; font-weight:600;
-  }
-  .quickitem-chip:hover{ border-color:var(--accent); color:var(--accent); }
   @media (max-width:640px){
     .addrow-grid1{ grid-template-columns:1fr 1fr; }
-    .addrow-grid2{ grid-template-columns:1fr 1fr; }
-    .addrow-grid2 button.addbtn{ grid-column:1/-1; justify-content:center; }
   }
 
   .toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 34px; }
@@ -483,7 +477,6 @@
 
       <div class="addrow">
         <div class="addrow-card">
-          <div class="quickitems-row" id="quickItemsRow" style="display:none;"></div>
           <div class="addrow-grid1">
             <input type="date" id="newDate">
             <select id="newCategory"></select>
@@ -493,9 +486,11 @@
           <div class="addrow-grid2">
             <select id="newCurrency"></select>
             <input type="number" id="newAmount" placeholder="금액" min="0" step="1">
+          </div>
+          <div class="item-receipt-row">
             <input type="text" id="newItem" placeholder="지출 항목" list="itemSuggestions">
             <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
-            <button type="button" class="receiptbtn" id="newReceiptBtn">📷 영수증</button>
+            <button type="button" class="receiptbtn" id="newReceiptBtn" title="영수증 사진 추가">📷</button>
           </div>
           <div class="fxrow" id="fxRow">
             <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
@@ -820,7 +815,7 @@
     const file = e.target.files[0];
     if(!file) return;
     pendingReceiptDataUrl = await compressImage(file, 900);
-    el('newReceiptBtn').textContent = pendingReceiptDataUrl ? '📷 첨부됨' : '📷 영수증';
+    el('newReceiptBtn').title = pendingReceiptDataUrl ? '영수증 사진 첨부됨 (탭하여 변경)' : '영수증 사진 추가';
     el('newReceiptBtn').classList.toggle('has-photo', !!pendingReceiptDataUrl);
   });
 
@@ -1066,31 +1061,6 @@
   }
 
   // ---------- 자주 쓰는 지출 항목 ----------
-  function computeFrequentItems(limit){
-    const counts = {};
-    tripExpenses(data.currentTripId).forEach(e => {
-      if(e.item) counts[e.item] = (counts[e.item]||0) + 1;
-    });
-    return Object.entries(counts)
-      .filter(([,c]) => c >= 2)
-      .sort((a,b) => b[1]-a[1])
-      .slice(0, limit)
-      .map(([name]) => name);
-  }
-  function renderQuickItems(){
-    const items = computeFrequentItems(6);
-    const wrap = el('quickItemsRow');
-    if(!items.length){ wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
-    wrap.style.display = 'flex';
-    wrap.innerHTML = items.map(name => `<button type="button" class="quickitem-chip" data-quickitem="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('');
-  }
-  el('quickItemsRow').addEventListener('click', e => {
-    const name = e.target.dataset.quickitem;
-    if(!name) return;
-    el('newItem').value = name;
-    el('newItem').focus();
-  });
-
   // ---------- 일자 라벨 ----------
   function dayInfo(trip, dateStr){
     if(!trip.startDate) return { label: dateStr, isNumbered:false };
@@ -1248,7 +1218,6 @@
     renderCategoryPanel();
     renderCountryPanel();
     renderTrendPanel();
-    renderQuickItems();
     renderDayGroups();
   }
 
@@ -1550,7 +1519,7 @@
       const summary = applyParsedFieldsToForm(parsed);
       // 인식에 사용한 사진을 영수증 첨부로도 함께 저장
       pendingReceiptDataUrl = await compressImage(file, 900);
-      el('newReceiptBtn').textContent = pendingReceiptDataUrl ? '📷 첨부됨' : '📷 영수증';
+      el('newReceiptBtn').title = pendingReceiptDataUrl ? '영수증 사진 첨부됨 (탭하여 변경)' : '영수증 사진 추가';
       el('newReceiptBtn').classList.toggle('has-photo', !!pendingReceiptDataUrl);
 
       note.textContent = `✓ 인식됨: ${summary || '항목 확인 필요'} — 확인 후 "+ 추가"를 눌러주세요`;
@@ -1602,7 +1571,7 @@
     el('smsPasteInput').value=''; el('smsPasteNote').textContent=''; el('smsPasteNote').classList.remove('warn');
     el('photoRecognizeNote').textContent=''; el('photoRecognizeNote').classList.remove('warn');
     pendingReceiptDataUrl = null;
-    el('newReceiptBtn').textContent = '📷 영수증'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
+    el('newReceiptBtn').title = '영수증 사진 추가'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
     updateFxPreview();
     render();
     closeAddExpenseModal();
