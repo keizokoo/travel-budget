@@ -259,10 +259,16 @@
     border-radius:9px; padding:8px 10px; font-size:12.5px;
   }
   .spot-rank{ flex-shrink:0; font-weight:800; font-size:11px; color:var(--accent); width:14px; }
-  .spot-name{ flex:1; min-width:0; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .spot-name{
+    flex:1; min-width:0; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    text-decoration:none;
+  }
+  .spot-name:hover{ color:var(--accent); }
   .spot-unnamed{ color:var(--ink3); font-weight:600; font-style:italic; }
-  .spot-maplink{ flex-shrink:0; font-size:11px; color:var(--ink3); text-decoration:none; margin-left:-4px; }
-  .spot-maplink:hover{ color:var(--accent); }
+  .spot-editbtn{
+    flex-shrink:0; background:none; border:none; font-size:12px; padding:2px 4px; opacity:.65; line-height:1;
+  }
+  .spot-editbtn:hover{ opacity:1; }
   .spot-dur{ flex-shrink:0; font-size:11.5px; color:var(--ink2); text-align:right; }
   .spot-attrib{ font-size:10.5px; color:var(--ink3); margin:2px 0 10px; }
 
@@ -896,6 +902,7 @@
       itineraryDays: [],
       timelineByTrip: {},
       placeNameCache: {},
+      placeNameOverride: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -916,6 +923,7 @@
     if(!d.itineraryDays) d.itineraryDays = [];
     if(!d.timelineByTrip) d.timelineByTrip = {};
     if(!d.placeNameCache) d.placeNameCache = {};
+    if(!d.placeNameOverride) d.placeNameOverride = {};
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1316,7 +1324,7 @@
     spots = spots || [];
     const bodyParts = [];
     if(spots.length){
-      const namedTop = spots.filter(s => s.label).slice(0,2).map(s => `${s.label} ${formatDuration(s.durationMin)}`);
+      const namedTop = topSpotsByDuration(spots.filter(s => s.label), 2).map(s => `${s.label} ${formatDuration(s.durationMin)}`);
       bodyParts.push(`오늘 ${spots.length}곳 방문${namedTop.length ? `(${namedTop.join(', ')})` : ''}`);
     }
     if(exps.length){
@@ -1379,6 +1387,9 @@
   function rangesOverlap(s1,e1,s2,e2){ return s1 <= e2 && s2 <= e1; }
   const SPOT_MIN_DURATION_MIN = 5;
   const SPOT_MERGE_DIST_M = 200;
+  function topSpotsByDuration(spots, n){
+    return spots.slice().sort((a,b) => b.durationMin - a.durationMin).slice(0, n);
+  }
 
   function computeDaySpots(trip, dateStr){
     const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
@@ -1400,12 +1411,12 @@
       }
     });
     const spots = merged.filter(v => v.durationMin >= SPOT_MIN_DURATION_MIN);
-    spots.forEach(v => { if(!v.label) v.label = cachedPlaceName(v.lat, v.lng); });
-    spots.sort((a,b) => b.durationMin - a.durationMin);
+    spots.forEach(v => { v.label = displayPlaceName(v); });
+    spots.sort((a,b) => a.startTime.localeCompare(b.startTime)); // 방문 순서(시간순)로 표시
     return spots;
   }
 
-  // ---------- 방문 스팟 → 실제 장소명 (OpenStreetMap Nominatim 역지오코딩) ----------
+  // ---------- 방문 스팟 → 실제 장소명 (OpenStreetMap Nominatim 역지오코딩 + 직접 수정 오버라이드) ----------
   function coordKey(lat, lng){ return `${lat.toFixed(4)},${lng.toFixed(4)}`; }
   function cachedPlaceName(lat, lng){
     if(lat == null || lng == null || !data.placeNameCache) return null;
@@ -1416,15 +1427,32 @@
     if(lat == null || lng == null) return false;
     return !!(data.placeNameCache && (coordKey(lat, lng) in data.placeNameCache));
   }
+  function overrideName(lat, lng){
+    if(lat == null || lng == null || !data.placeNameOverride) return null;
+    return data.placeNameOverride[coordKey(lat, lng)] || null;
+  }
+  function displayPlaceName(v){
+    if(v.lat == null || v.lng == null) return v.label || null;
+    return overrideName(v.lat, v.lng) || v.label || cachedPlaceName(v.lat, v.lng);
+  }
+  function setPlaceNameOverride(lat, lng, name){
+    if(!data.placeNameOverride) data.placeNameOverride = {};
+    const key = coordKey(lat, lng);
+    if(name){ data.placeNameOverride[key] = name; }
+    else{ delete data.placeNameOverride[key]; }
+    saveData(data);
+  }
   async function fetchPlaceNameFromOSM(lat, lng){
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=ko`;
     const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
     if(!res.ok) throw new Error('geocode-http-' + res.status);
     const json = await res.json();
     const addr = json.address || {};
-    const poi = json.name || addr.tourism || addr.attraction || addr.amenity || addr.shop || addr.leisure || addr.museum || addr.building || null;
+    const isValidName = s => typeof s === 'string' && s.trim().length >= 2 && !/^\d+$/.test(s.trim());
+    const candidates = [json.name, addr.tourism, addr.attraction, addr.amenity, addr.shop, addr.leisure, addr.museum, addr.building];
+    const poi = candidates.find(isValidName) || null;
     if(poi) return { name: poi, precise: true };
-    if(addr.road) return { name: `${addr.road} 부근`, precise: false };
+    if(isValidName(addr.road)) return { name: `${addr.road} 부근`, precise: false };
     return { name: null, precise: false };
   }
   let geocodeChain = Promise.resolve();
@@ -1546,9 +1574,10 @@
     if(v.kind === 'activity'){
       placeHtml = `<span class="route-activity">${escapeHtml(v.label)}</span>`;
     }else{
-      const resolvedName = v.label || cachedPlaceName(v.lat, v.lng);
+      const resolvedName = displayPlaceName(v);
       if(resolvedName){
-        placeHtml = escapeHtml(resolvedName);
+        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+        placeHtml = `<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">${escapeHtml(resolvedName)}</a>`;
       }else if(v.lat != null && v.lng != null){
         const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
         placeHtml = hasCachedLookup(v.lat, v.lng)
@@ -1580,25 +1609,19 @@
     const rows = spots.map((v,i) => {
       const dur = formatDuration(v.durationMin);
       const timeRange = `${v.startTime}~${v.endTime}`;
-      let nameHtml;
-      if(v.label){
-        nameHtml = `<span class="spot-name">${escapeHtml(v.label)}</span>`;
-      }else if(hasCachedLookup(v.lat, v.lng)){
-        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
-        nameHtml = `<span class="spot-name spot-unnamed">이름 미확인 장소</span><a class="spot-maplink" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">지도보기</a>`;
-      }else{
-        const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
-        nameHtml = `<span class="spot-name spot-unnamed">위치 확인 중…</span><a class="spot-maplink" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">지도보기</a>`;
-      }
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+      const isNamed = !!v.label;
+      const displayName = v.label || (hasCachedLookup(v.lat, v.lng) ? '이름 미확인 장소' : '위치 확인 중…');
       return `<div class="spot-chip">
         <span class="spot-rank">${i+1}</span>
-        ${nameHtml}
+        <a class="spot-name${isNamed ? '' : ' spot-unnamed'}" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">${escapeHtml(displayName)}</a>
+        <button type="button" class="spot-editbtn" data-rename-spot data-lat="${v.lat}" data-lng="${v.lng}" data-name="${escapeHtml(v.label || '')}" title="장소 이름 수정">✏️</button>
         <span class="spot-dur tabular">${dur} · ${timeRange}</span>
       </div>`;
     }).join('');
-    return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (체류시간 순)</div>
+    return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (방문 순서)</div>
       <div class="spot-list">${rows}</div>
-      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자</div>`;
+      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · 장소명을 탭하면 구글 지도로 이동, ✏️로 직접 수정할 수 있어요</div>`;
   }
 
   function itineraryDayCardHtml(trip, dateStr){
@@ -2481,6 +2504,19 @@
     day.note = ta.value;
     clearTimeout(dayNoteSaveTimer);
     dayNoteSaveTimer = setTimeout(() => saveData(data), 400);
+  });
+
+  // ---------- 일자별 요약: 방문 스팟 이름 직접 수정 ----------
+  el('itineraryDays').addEventListener('click', e => {
+    const btn = e.target.closest('[data-rename-spot]');
+    if(!btn) return;
+    e.preventDefault();
+    const lat = parseFloat(btn.dataset.lat), lng = parseFloat(btn.dataset.lng);
+    const current = btn.dataset.name || '';
+    const input = prompt('이 장소의 실제 이름을 입력해주세요 (비워두고 확인하면 자동인식 결과로 되돌아갑니다)', current);
+    if(input === null) return;
+    setPlaceNameOverride(lat, lng, input.trim());
+    renderItineraryTab();
   });
 
   // ---------- 지출 추가 (FAB + 모달) ----------
