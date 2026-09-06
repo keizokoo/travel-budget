@@ -216,7 +216,7 @@
 
   .empty{ text-align:center; padding:34px 10px; color:var(--ink2); font-size:13px; }
 
-  /* ---------- 여행 일정 ---------- */
+  /* ---------- 일자별 요약 ---------- */
   .itin-daycard{
     background:var(--surface); border:1px solid var(--line2); border-radius:14px;
     padding:14px 14px 12px; margin-bottom:14px; box-shadow:var(--shadow);
@@ -225,53 +225,54 @@
   .itin-daytitle{ font-weight:700; font-size:13.5px; font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; }
   .itin-daydate{ font-size:11.5px; color:var(--ink2); }
   .itin-empty-note{ font-size:12px; color:var(--ink3); padding:4px 0 8px; }
-  .itin-items{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
-  .itin-item{ display:flex; align-items:center; gap:9px; padding:7px 2px; border-bottom:1px solid var(--line); }
-  .itin-item:last-child{ border-bottom:none; }
-  .itin-time{ font-size:11.5px; font-weight:700; color:var(--accent); width:44px; flex-shrink:0; }
-  .itin-time-empty{ color:var(--ink3); text-align:center; }
-  .itin-text{ flex:1; font-size:12.5px; }
-  .itin-photos{ display:grid; grid-template-columns:repeat(auto-fill, minmax(72px,1fr)); gap:8px; margin-bottom:10px; }
-  .itin-photo{ position:relative; }
-  .itin-photo img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; border:1px solid var(--line2); cursor:pointer; display:block; }
-  .itin-photo-del{
-    position:absolute; top:-6px; right:-6px; width:19px; height:19px; border-radius:50%;
-    background:var(--warn); color:var(--on-warn); border:2px solid var(--surface); font-size:10px; line-height:1;
-    display:flex; align-items:center; justify-content:center; padding:0;
-  }
-  .itin-links{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
-  .itin-link{
-    display:flex; align-items:center; gap:8px; border:1px solid var(--line2); background:var(--bg);
-    border-radius:9px; padding:7px 10px;
-  }
-  .itin-link a{
-    flex:1; min-width:0; color:var(--ink); font-size:12px; font-weight:600; text-decoration:none;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .itin-link a:hover{ color:var(--accent); }
-  .itin-link-del{ background:none; border:none; color:var(--ink3); font-size:12px; flex-shrink:0; padding:2px; }
-  .itin-link-del:hover{ color:var(--warn); }
-  .itin-addbtn{
-    display:block; width:100%; text-align:center;
-    border:1px dashed var(--ink3); background:var(--bg); color:var(--ink2);
-    border-radius:9px; padding:9px 12px; font-size:12px; font-weight:700;
-  }
-  .itin-addbtn:hover{ border-color:var(--accent); color:var(--accent); }
-
-  .itin-add-modal{ width:min(420px,92vw); text-align:left; }
-  .itin-add-section{ margin-bottom:16px; }
-  .itin-add-section:last-child{ margin-bottom:4px; }
   .itin-add-label{ display:block; font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
-  .itin-add-row{ display:flex; gap:8px; }
-  .itin-add-row input[type=time]{ width:92px; flex-shrink:0; }
-  .itin-add-row input{
-    border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink); min-width:0;
+
+  .day-summary{
+    font-size:12.5px; font-weight:600; color:var(--ink); background:var(--bg);
+    border:1px solid var(--line2); border-radius:9px; padding:9px 11px; margin-bottom:10px; line-height:1.5;
   }
-  .itin-add-row input[type=text], .itin-add-row input[type=url]{ flex:1; }
-  .itin-add-row input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
-  .itin-add-row button.addbtn{
-    background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700; white-space:nowrap; flex-shrink:0;
+  .day-explist{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
+  .day-expitem{ display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px solid var(--line); font-size:12px; }
+  .day-expitem:last-child{ border-bottom:none; }
+  .day-expcat{
+    flex-shrink:0; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:999px;
+    color:var(--tagc, var(--ink2)); border:1px solid var(--tagc, var(--line2));
   }
+  .day-expitemname{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink2); }
+  .day-expamt{ flex-shrink:0; font-weight:700; }
+
+  .day-route{ margin-bottom:10px; border-top:1px dashed var(--line2); padding-top:10px; }
+  .day-route-label{ font-size:11.5px; font-weight:700; color:var(--ink2); margin-bottom:6px; }
+  .route-item{ display:flex; align-items:baseline; gap:9px; padding:5px 2px; font-size:12px; }
+  .route-time{ flex-shrink:0; width:92px; color:var(--ink3); font-size:11px; }
+  .route-place{ flex:1; min-width:0; }
+  .route-place a{ color:var(--ink); text-decoration:none; }
+  .route-place a:hover{ color:var(--accent); }
+  .route-activity{ color:var(--ink3); font-style:italic; }
+  .route-warn{ cursor:help; }
+
+  .day-note-wrap{ margin-top:2px; }
+  .day-note{
+    width:100%; min-height:52px; resize:vertical; border:1px solid var(--line2); border-radius:9px;
+    padding:8px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); font-family:inherit;
+  }
+  .day-note:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .timeline-upload-box{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    background:var(--surface); border:1px solid var(--line2); border-radius:12px; padding:12px 14px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .timeline-upload-active{ border-color:var(--good); }
+  .timeline-upload-text{ font-size:12px; color:var(--ink2); flex:1; min-width:180px; }
+  .timeline-upload-actions{ display:flex; gap:6px; flex-wrap:wrap; }
+  .timeline-help{
+    background:var(--bg); border:1px dashed var(--line2); border-radius:12px; padding:12px 14px; margin-bottom:14px; font-size:12px; color:var(--ink2);
+  }
+  .timeline-help-title{ font-weight:700; color:var(--ink); margin-bottom:8px; font-size:12.5px; }
+  .timeline-help-sub{ font-weight:700; color:var(--ink); margin:10px 0 4px; }
+  .timeline-help ol{ margin:0 0 0 18px; padding:0; }
+  .timeline-help li{ margin-bottom:2px; }
+  .timeline-help-note{ margin-top:10px; color:var(--ink3); }
 
   /* ---------- 문자 붙여넣기 ---------- */
   .smspaste{ margin-top:4px; margin-bottom:14px; }
@@ -505,7 +506,7 @@
 
     <div class="maintabs">
       <button type="button" class="maintab active" id="tabExpenseBtn" data-tab="expense">💰 지출 내역</button>
-      <button type="button" class="maintab" id="tabItineraryBtn" data-tab="itinerary">🗓 여행 일정</button>
+      <button type="button" class="maintab" id="tabItineraryBtn" data-tab="itinerary">🗓 일자별 요약</button>
     </div>
 
     <div id="expenseTabPanel">
@@ -622,41 +623,33 @@
 
     <div id="itineraryTabPanel" style="display:none;">
       <div class="sectionhead">
-        <h3>여행 일정</h3>
+        <h3>일자별 요약</h3>
         <span class="count" id="itineraryLabel"></span>
       </div>
+      <div id="timelineStatusBox"></div>
+      <div class="timeline-help" id="timelineHelpPanel" style="display:none;">
+        <div class="timeline-help-title">📥 구글 타임라인 파일 다운로드 방법</div>
+        <div class="timeline-help-sub">📱 Android</div>
+        <ol>
+          <li>휴대폰 [설정] 앱 → [위치] (또는 [위치 서비스])</li>
+          <li>[타임라인] 선택</li>
+          <li>[타임라인 데이터 내보내기] 탭</li>
+          <li>[계속] → [저장] — JSON 파일이 휴대폰에 저장됩니다</li>
+        </ol>
+        <div class="timeline-help-sub">🍎 iPhone</div>
+        <ol>
+          <li>구글 지도 앱 실행 → 우측 상단 프로필 아이콘 탭</li>
+          <li>[내 타임라인] 선택</li>
+          <li>우측 상단 점 3개(⋯) 메뉴 → [위치 및 개인정보 설정]</li>
+          <li>[타임라인 데이터 내보내기] 탭</li>
+        </ol>
+        <div class="timeline-help-note">저장된 파일(보통 Timeline.json)을 "타임라인 업로드" 버튼으로 선택하면 이 화면에 자동 반영됩니다. 일부 EU 지역 계정은 JSON 대신 CSV로 저장될 수 있는데, 이 경우는 아직 지원되지 않습니다.</div>
+      </div>
+      <input type="file" id="timelineFileInput" accept="application/json,.json" style="display:none;">
       <div id="itineraryDays"></div>
       <div id="itineraryEmptyState" class="empty" style="display:none;"></div>
     </div>
 
-  </div>
-</div>
-
-<div class="overlay" id="itinAddOverlay"></div>
-<div class="modal itin-add-modal" id="itinAddModal">
-  <div class="modal-head">
-    <h3 id="itinAddModalTitle">일정 추가</h3>
-    <button class="closebtn" id="itinAddModalClose">✕</button>
-  </div>
-  <div class="itin-add-section">
-    <label class="itin-add-label">📝 일정 (시간 + 내용)</label>
-    <div class="itin-add-row">
-      <input type="time" id="itinNewTime">
-      <input type="text" id="itinNewText" placeholder="예: 공항 도착, 호텔 체크인">
-      <button type="button" class="addbtn" id="itinAddItemBtn">추가</button>
-    </div>
-  </div>
-  <div class="itin-add-section">
-    <label class="itin-add-label">📷 사진</label>
-    <input type="file" id="itinPhotoFile" accept="image/*" multiple style="display:none;">
-    <button type="button" class="photorecog-btn" id="itinPhotoBtn">사진 추가 (여러 장 선택 가능)</button>
-  </div>
-  <div class="itin-add-section">
-    <label class="itin-add-label">🔗 링크</label>
-    <div class="itin-add-row">
-      <input type="url" id="itinNewLink" placeholder="https://...">
-      <button type="button" class="addbtn" id="itinAddLinkBtn">추가</button>
-    </div>
   </div>
 </div>
 
@@ -886,6 +879,7 @@
       currentTripId: tripId,
       expenses: [],
       itineraryDays: [],
+      timelineByTrip: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -904,6 +898,7 @@
     if(!d.currentTripId || !d.trips.find(t => t.id === d.currentTripId)) d.currentTripId = d.trips[0].id;
     if(!d.expenses) d.expenses = [];
     if(!d.itineraryDays) d.itineraryDays = [];
+    if(!d.timelineByTrip) d.timelineByTrip = {};
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1293,64 +1288,202 @@
   function getOrCreateDay(tripId, dateStr){
     let day = data.itineraryDays.find(d => d.tripId === tripId && d.date === dateStr);
     if(!day){
-      day = { id: uid(), tripId, date: dateStr, items: [], photos: [], links: [] };
+      day = { id: uid(), tripId, date: dateStr, items: [], photos: [], links: [], note: '' };
       data.itineraryDays.push(day);
     }
     return day;
   }
-  function shortenUrl(url){
-    try{
-      const u = new URL(url);
-      let s = u.hostname.replace(/^www\./,'') + u.pathname;
-      if(s.length > 30) s = s.slice(0,28) + '…';
-      return s;
-    }catch(e){
-      return url.length > 30 ? url.slice(0,28) + '…' : url;
+
+  // ---------- 지출 기반 일자 요약 문장 자동 생성 ----------
+  function daySummaryText(exps){
+    if(!exps.length) return '';
+    const byCategory = {};
+    let total = 0;
+    exps.forEach(e => {
+      byCategory[e.category] = (byCategory[e.category]||0) + 1;
+      total += e.amountKrw;
+    });
+    const parts = Object.entries(byCategory).map(([cat,cnt]) => `${cat} ${cnt}건`);
+    const countries = [...new Set(exps.map(e => e.country).filter(Boolean))];
+    const flagLabel = countries.map(c => `${countryFlag(c)} ${c}`).join(', ');
+    return `${flagLabel ? flagLabel + '에서 ' : ''}${parts.join(', ')} 지출 — 총 ${exps.length}건, ${won(total)} 사용`;
+  }
+
+  // ---------- 구글 타임라인 JSON 파싱 (시간대는 원본 문자열의 오프셋을 그대로 사용) ----------
+  function isoLocalParts(iso){
+    if(!iso || typeof iso !== 'string') return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/.exec(iso.trim());
+    if(!m) return null;
+    return {
+      date: `${m[1]}-${m[2]}-${m[3]}`,
+      time: `${m[4]}:${m[5]}`,
+      hasOffset: !!(m[7] && m[7] !== 'Z')
+    };
+  }
+  function parseLatLngString(s){
+    if(!s) return null;
+    const str = String(s).replace(/^geo:/,'');
+    const m = str.match(/(-?\d+(?:\.\d+)?)°?\s*,\s*(-?\d+(?:\.\d+)?)°?/);
+    if(!m) return null;
+    return { lat: parseFloat(m[1]), lng: parseFloat(m[2]) };
+  }
+  const ACTIVITY_TYPE_LABELS = {
+    IN_PASSENGER_VEHICLE:'자동차 이동', IN_VEHICLE:'차량 이동', IN_BUS:'버스 이동', IN_TRAIN:'기차 이동',
+    IN_SUBWAY:'지하철 이동', IN_TRAM:'트램 이동', WALKING:'도보 이동', ON_FOOT:'도보 이동',
+    CYCLING:'자전거 이동', IN_FERRY:'페리 이동', FLYING:'비행기 이동', IN_TAXI:'택시 이동',
+    MOTORCYCLING:'오토바이 이동', RUNNING:'달리기 이동', STILL:'정지'
+  };
+  function activityTypeLabel(type){ return ACTIVITY_TYPE_LABELS[type] || '이동'; }
+
+  function normalizeSemanticSegment(seg){
+    if(!seg) return null;
+    const startParts = isoLocalParts(seg.startTime);
+    if(!startParts) return null;
+    const endParts = seg.endTime ? isoLocalParts(seg.endTime) : null;
+    if(seg.visit){
+      const tc = seg.visit.topCandidate || {};
+      const latLng = parseLatLngString(tc.placeLocation && (tc.placeLocation.latLng || tc.placeLocation));
+      return {
+        date: startParts.date, startTime: startParts.time, endTime: endParts ? endParts.time : null,
+        kind: 'visit', label: tc.name || null,
+        lat: latLng ? latLng.lat : null, lng: latLng ? latLng.lng : null,
+        hasOffset: startParts.hasOffset
+      };
     }
+    if(seg.activity){
+      const tc = seg.activity.topCandidate || {};
+      return {
+        date: startParts.date, startTime: startParts.time, endTime: endParts ? endParts.time : null,
+        kind: 'activity', label: activityTypeLabel(tc.type), lat:null, lng:null,
+        hasOffset: startParts.hasOffset
+      };
+    }
+    return null;
+  }
+  function normalizeLegacyObject(obj){
+    if(!obj) return null;
+    if(obj.placeVisit){
+      const pv = obj.placeVisit;
+      const dur = pv.duration || {};
+      const startParts = isoLocalParts(dur.startTimestamp);
+      if(!startParts) return null;
+      const endParts = dur.endTimestamp ? isoLocalParts(dur.endTimestamp) : null;
+      const loc = pv.location || {};
+      return {
+        date: startParts.date, startTime: startParts.time, endTime: endParts ? endParts.time : null,
+        kind: 'visit', label: loc.name || loc.address || null,
+        lat: typeof loc.latitudeE7 === 'number' ? loc.latitudeE7/1e7 : null,
+        lng: typeof loc.longitudeE7 === 'number' ? loc.longitudeE7/1e7 : null,
+        hasOffset: startParts.hasOffset
+      };
+    }
+    if(obj.activitySegment){
+      const as = obj.activitySegment;
+      const dur = as.duration || {};
+      const startParts = isoLocalParts(dur.startTimestamp);
+      if(!startParts) return null;
+      const endParts = dur.endTimestamp ? isoLocalParts(dur.endTimestamp) : null;
+      return {
+        date: startParts.date, startTime: startParts.time, endTime: endParts ? endParts.time : null,
+        kind: 'activity', label: activityTypeLabel(as.activityType), lat:null, lng:null,
+        hasOffset: startParts.hasOffset
+      };
+    }
+    return null;
+  }
+  function parseGoogleTimelineJson(json){
+    const visits = [];
+    if(json && Array.isArray(json.semanticSegments)){
+      json.semanticSegments.forEach(seg => { const v = normalizeSemanticSegment(seg); if(v) visits.push(v); });
+    }else if(Array.isArray(json)){
+      json.forEach(seg => { const v = normalizeSemanticSegment(seg); if(v) visits.push(v); });
+    }else if(json && Array.isArray(json.timelineObjects)){
+      json.timelineObjects.forEach(obj => { const v = normalizeLegacyObject(obj); if(v) visits.push(v); });
+    }else{
+      throw new Error('unrecognized-timeline-format');
+    }
+    return visits;
+  }
+
+  function routeItemHtml(v){
+    const timeLabel = v.startTime ? `${v.startTime}${v.endTime && v.endTime !== v.startTime ? '~'+v.endTime : ''}` : '';
+    const warn = v.hasOffset ? '' : ' <span class="route-warn" title="원본 데이터에 시간대 정보가 없어 실제 현지 시간과 다를 수 있어요">⚠</span>';
+    let placeHtml;
+    if(v.kind === 'activity'){
+      placeHtml = `<span class="route-activity">${escapeHtml(v.label)}</span>`;
+    }else if(v.label){
+      placeHtml = escapeHtml(v.label);
+    }else if(v.lat != null && v.lng != null){
+      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+      placeHtml = `<a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">📍 ${v.lat.toFixed(4)}, ${v.lng.toFixed(4)} (지도에서 보기)</a>`;
+    }else{
+      placeHtml = '알 수 없는 위치';
+    }
+    return `<div class="route-item">
+      <span class="route-time tabular">${timeLabel}${warn}</span>
+      <span class="route-place">${placeHtml}</span>
+    </div>`;
+  }
+  function dayTimelineHtml(trip, dateStr){
+    const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
+    if(!bucket || !bucket.visits.length) return '';
+    const dayVisits = bucket.visits.filter(v => v.date === dateStr).sort((a,b)=> (a.startTime||'').localeCompare(b.startTime||''));
+    if(!dayVisits.length) return '';
+    return `<div class="day-route">
+      <div class="day-route-label">📍 이동 경로 (구글 타임라인)</div>
+      ${dayVisits.map(v => routeItemHtml(v)).join('')}
+    </div>`;
   }
 
   function itineraryDayCardHtml(trip, dateStr){
-    const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const info = dayInfo(trip, dateStr);
-    const items = day ? day.items.slice().sort((a,b)=>{
-      if(!a.time && !b.time) return 0;
-      if(!a.time) return 1;
-      if(!b.time) return -1;
-      return a.time.localeCompare(b.time);
-    }) : [];
-    const photos = day ? day.photos : [];
-    const links = day ? day.links : [];
-    const empty = !items.length && !photos.length && !links.length;
+    const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
+    const summary = daySummaryText(exps);
+    const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
+    const note = day ? (day.note || '') : '';
 
-    const itemsHtml = items.length ? `<div class="itin-items">${items.map(it => `
-      <div class="itin-item">
-        ${it.time ? `<span class="itin-time tabular">${escapeHtml(it.time)}</span>` : '<span class="itin-time itin-time-empty">·</span>'}
-        <span class="itin-text">${escapeHtml(it.text)}</span>
-        <button class="miniicon" data-del-item="${it.id}" data-day="${dateStr}" title="삭제">✕</button>
-      </div>`).join('')}</div>` : '';
+    const expenseListHtml = exps.length ? `<div class="day-explist">${exps.map(e => `
+      <div class="day-expitem">
+        <span class="day-expcat" style="--tagc:${tagColor(data.categories, e.category)}">${escapeHtml(e.category)}</span>
+        <span class="day-expitemname">${escapeHtml(e.item)}</span>
+        <span class="day-expamt tabular">${won(e.amountKrw)}</span>
+      </div>`).join('')}</div>` : '<div class="itin-empty-note">이 날짜에 등록된 지출이 없어요</div>';
 
-    const photosHtml = photos.length ? `<div class="itin-photos">${photos.map((p,i) => `
-      <div class="itin-photo">
-        <img src="${p}" data-itin-photo="${dateStr}" alt="사진">
-        <button class="itin-photo-del" data-del-photo-day="${dateStr}" data-del-photo-idx="${i}" title="삭제">✕</button>
-      </div>`).join('')}</div>` : '';
-
-    const linksHtml = links.length ? `<div class="itin-links">${links.map(l => `
-      <div class="itin-link">
-        <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">🔗 ${escapeHtml(shortenUrl(l.url))}</a>
-        <button class="itin-link-del" data-del-link-day="${dateStr}" data-del-link="${l.id}" title="삭제">✕</button>
-      </div>`).join('')}</div>` : '';
+    const routeHtml = dayTimelineHtml(trip, dateStr);
 
     return `<div class="itin-daycard">
       <div class="itin-daycard-head">
         <span class="itin-daytitle">${info.isNumbered ? info.label : dateStr}</span>
         <span class="itin-daydate">${dateStr.slice(5).replace('-','.')}</span>
       </div>
-      ${empty ? '<div class="itin-empty-note">아직 등록된 일정이 없어요</div>' : ''}
-      ${itemsHtml}
-      ${photosHtml}
-      ${linksHtml}
-      <button type="button" class="itin-addbtn" data-add-day="${dateStr}">+ 일정 · 사진 · 링크 추가</button>
+      ${summary ? `<div class="day-summary">${escapeHtml(summary)}</div>` : ''}
+      ${expenseListHtml}
+      ${routeHtml}
+      <div class="day-note-wrap">
+        <label class="itin-add-label">✏️ 메모</label>
+        <textarea class="day-note" data-note-day="${dateStr}" placeholder="이 날의 기억, 느낀점 등을 자유롭게 적어보세요">${escapeHtml(note)}</textarea>
+      </div>
+    </div>`;
+  }
+
+  function timelineStatusHtml(trip){
+    const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
+    if(!bucket){
+      return `<div class="timeline-upload-box">
+        <div class="timeline-upload-text">📍 구글 타임라인 파일을 업로드하면 이동 경로가 날짜별로 자동 정리돼요. (선택 사항)</div>
+        <div class="timeline-upload-actions">
+          <button type="button" class="addbtn" id="timelineUploadBtn">타임라인 업로드</button>
+          <button type="button" class="miniicon" id="timelineHelpBtn">❓ 다운로드 방법</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="timeline-upload-box timeline-upload-active">
+      <div class="timeline-upload-text">✅ ${escapeHtml(bucket.fileName)} · 위치 기록 ${bucket.visits.length}건 연동됨 (${bucket.uploadedAt.slice(0,10)} 업로드)</div>
+      <div class="timeline-upload-actions">
+        <button type="button" class="miniicon" id="timelineUploadBtn">🔄 다시 업로드</button>
+        <button type="button" class="miniicon" id="timelineHelpBtn">❓ 다운로드 방법</button>
+        <button type="button" class="miniicon" id="timelineRemoveBtn">🗑 연동 해제</button>
+      </div>
     </div>`;
   }
 
@@ -1358,9 +1491,10 @@
     const trip = currentTrip();
     const dates = tripDateRange(trip);
     el('itineraryLabel').textContent = trip.name;
+    el('timelineStatusBox').innerHTML = timelineStatusHtml(trip);
     if(!dates.length){
       el('itineraryEmptyState').style.display = 'block';
-      el('itineraryEmptyState').textContent = '여행 기간을 설정하면 하루하루 일정을 등록할 수 있어요. (⚙ 설정 → 현재 여행 설정에서 기간 입력)';
+      el('itineraryEmptyState').textContent = '여행 기간을 설정하면 하루하루 요약이 자동으로 생성돼요. (⚙ 설정 → 현재 여행 설정에서 기간 입력)';
       el('itineraryDays').innerHTML = '';
       return;
     }
@@ -1585,6 +1719,7 @@
     if(!confirm(`'${trip.name}' 여행과 그 안의 모든 지출 내역을 삭제합니다. 계속할까요?`)) return;
     data.expenses = data.expenses.filter(e => e.tripId !== trip.id);
     data.itineraryDays = data.itineraryDays.filter(d => d.tripId !== trip.id);
+    if(data.timelineByTrip) delete data.timelineByTrip[trip.id];
     data.trips = data.trips.filter(t => t.id !== trip.id);
     data.currentTripId = data.trips[0].id;
     saveData(data);
@@ -2131,112 +2266,51 @@
   el('tabExpenseBtn').addEventListener('click', () => switchMainTab('expense'));
   el('tabItineraryBtn').addEventListener('click', () => switchMainTab('itinerary'));
 
-  // ---------- 여행 일정 추가 모달 ----------
-  let itinAddModalDate = null;
-  function openItinAddModal(dateStr){
-    itinAddModalDate = dateStr;
-    const trip = currentTrip();
-    const info = dayInfo(trip, dateStr);
-    el('itinAddModalTitle').textContent = `${info.isNumbered ? info.label + ' · ' : ''}${dateStr.slice(5).replace('-','.')} 일정 추가`;
-    el('itinNewTime').value = '';
-    el('itinNewText').value = '';
-    el('itinNewLink').value = '';
-    el('itinAddModal').classList.add('show');
-    el('itinAddOverlay').classList.add('show');
-  }
-  function closeItinAddModal(){
-    el('itinAddModal').classList.remove('show');
-    el('itinAddOverlay').classList.remove('show');
-    itinAddModalDate = null;
-  }
-  el('itinAddModalClose').addEventListener('click', closeItinAddModal);
-  el('itinAddOverlay').addEventListener('click', closeItinAddModal);
-
-  el('itinAddItemBtn').addEventListener('click', () => {
-    if(!itinAddModalDate) return;
-    const text = el('itinNewText').value.trim();
-    if(!text){ showToast('일정 내용을 입력해주세요'); return; }
-    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
-    day.items.push({ id: uid(), time: el('itinNewTime').value || '', text });
-    saveData(data);
-    el('itinNewTime').value = '';
-    el('itinNewText').value = '';
-    el('itinNewText').focus();
-    renderItineraryTab();
-    showToast('일정이 추가되었습니다');
-  });
-  el('itinNewText').addEventListener('keydown', e => { if(e.key === 'Enter') el('itinAddItemBtn').click(); });
-
-  el('itinPhotoBtn').addEventListener('click', () => el('itinPhotoFile').click());
-  el('itinPhotoFile').addEventListener('change', async (e) => {
-    if(!itinAddModalDate) return;
-    const files = Array.from(e.target.files || []);
-    if(!files.length) return;
-    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
-    for(const f of files){
-      const durl = await compressImage(f, 900);
-      if(durl) day.photos.push(durl);
+  // ---------- 일자별 요약: 구글 타임라인 업로드 / 도움말 ----------
+  el('itineraryTabPanel').addEventListener('click', e => {
+    if(e.target.closest('#timelineUploadBtn')){ el('timelineFileInput').click(); return; }
+    if(e.target.closest('#timelineHelpBtn')){
+      const p = el('timelineHelpPanel');
+      p.style.display = (p.style.display === 'none' || !p.style.display) ? 'block' : 'none';
+      return;
     }
-    saveData(data);
+    if(e.target.closest('#timelineRemoveBtn')){
+      if(data.timelineByTrip) delete data.timelineByTrip[data.currentTripId];
+      saveData(data);
+      renderItineraryTab();
+      showToast('타임라인 연동이 해제되었습니다');
+      return;
+    }
+  });
+  el('timelineFileInput').addEventListener('change', async e => {
+    const file = e.target.files[0];
     e.target.value = '';
-    renderItineraryTab();
-    showToast('사진이 추가되었습니다');
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const json = JSON.parse(text);
+      const visits = parseGoogleTimelineJson(json);
+      if(!visits.length){ showToast('타임라인 파일에서 위치 기록을 찾지 못했습니다'); return; }
+      if(!data.timelineByTrip) data.timelineByTrip = {};
+      data.timelineByTrip[data.currentTripId] = { fileName: file.name, uploadedAt: new Date().toISOString(), visits };
+      saveData(data);
+      renderItineraryTab();
+      showToast(`타임라인 위치 기록 ${visits.length}건을 연동했습니다`);
+    }catch(err){
+      console.warn('timeline parse failed', err);
+      showToast('타임라인 파일을 읽지 못했습니다. Timeline.json 파일이 맞는지 확인해주세요');
+    }
   });
 
-  el('itinAddLinkBtn').addEventListener('click', () => {
-    if(!itinAddModalDate) return;
-    let url = el('itinNewLink').value.trim();
-    if(!url){ showToast('링크 주소를 입력해주세요'); return; }
-    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
-    const day = getOrCreateDay(data.currentTripId, itinAddModalDate);
-    day.links.push({ id: uid(), url });
-    saveData(data);
-    el('itinNewLink').value = '';
-    renderItineraryTab();
-    showToast('링크가 추가되었습니다');
-  });
-  el('itinNewLink').addEventListener('keydown', e => { if(e.key === 'Enter') el('itinAddLinkBtn').click(); });
-
-  el('itineraryDays').addEventListener('click', e => {
-    const addDayBtn = e.target.closest('[data-add-day]');
-    if(addDayBtn){ openItinAddModal(addDayBtn.dataset.addDay); return; }
-
-    const delItemBtn = e.target.closest('[data-del-item]');
-    if(delItemBtn){
-      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delItemBtn.dataset.day);
-      if(day){
-        day.items = day.items.filter(x => x.id !== delItemBtn.dataset.delItem);
-        saveData(data); renderItineraryTab();
-      }
-      return;
-    }
-
-    const delPhotoBtn = e.target.closest('[data-del-photo-day]');
-    if(delPhotoBtn){
-      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delPhotoBtn.dataset.delPhotoDay);
-      if(day){
-        day.photos.splice(Number(delPhotoBtn.dataset.delPhotoIdx), 1);
-        saveData(data); renderItineraryTab();
-      }
-      return;
-    }
-
-    const delLinkBtn = e.target.closest('[data-del-link]');
-    if(delLinkBtn){
-      const day = data.itineraryDays.find(d => d.tripId === data.currentTripId && d.date === delLinkBtn.dataset.delLinkDay);
-      if(day){
-        day.links = day.links.filter(x => x.id !== delLinkBtn.dataset.delLink);
-        saveData(data); renderItineraryTab();
-      }
-      return;
-    }
-
-    const photoImg = e.target.closest('[data-itin-photo]');
-    if(photoImg){
-      el('photoModalImg').src = photoImg.src;
-      openPhotoModal();
-      return;
-    }
+  // ---------- 일자별 요약: 메모 자동 저장 ----------
+  let dayNoteSaveTimer = null;
+  el('itineraryDays').addEventListener('input', e => {
+    const ta = e.target.closest('[data-note-day]');
+    if(!ta) return;
+    const day = getOrCreateDay(data.currentTripId, ta.dataset.noteDay);
+    day.note = ta.value;
+    clearTimeout(dayNoteSaveTimer);
+    dayNoteSaveTimer = setTimeout(() => saveData(data), 400);
   });
 
   // ---------- 지출 추가 (FAB + 모달) ----------
