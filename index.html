@@ -295,11 +295,6 @@
     background:var(--surface); border:1px solid var(--line2); border-radius:999px; padding:1px 6px;
   }
   .spot-chip.addr .spot-tagbadge{ color:var(--good); border-color:var(--good); }
-  .spot-reorder{ flex-shrink:0; display:flex; gap:1px; }
-  .spot-orderbtn{
-    background:none; border:none; font-size:10px; padding:2px 3px; opacity:.55; line-height:1; color:var(--ink2);
-  }
-  .spot-orderbtn:hover{ opacity:1; }
 
   .day-note-wrap{ margin-top:2px; }
   .day-note{
@@ -941,7 +936,6 @@
       timelineByTrip: {},
       placeNameCache: {},
       placeNameOverride: {},
-      entryOrderOverride: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -963,19 +957,6 @@
     if(!d.timelineByTrip) d.timelineByTrip = {};
     if(!d.placeNameCache) d.placeNameCache = {};
     if(!d.placeNameOverride) d.placeNameOverride = {};
-    if(!d.entryOrderOverride) d.entryOrderOverride = {};
-    // 일회성 마이그레이션: 예전 버전(지출 항목만 순서 보정 가능하던 시절)의 expenseOrderOverride를
-    // 새 통합 맵(entryOrderOverride, GPS 방문지도 보정 가능)으로 옮긴다 — 지출 id는 "exp:" 접두사를 붙인다.
-    if(!d._migrations) d._migrations = {};
-    if(!d._migrations.mergeExpenseOrderOverride){
-      if(d.expenseOrderOverride){
-        Object.entries(d.expenseOrderOverride).forEach(([expId, min]) => {
-          const key = expId.startsWith('exp:') || expId.startsWith('gps:') ? expId : `exp:${expId}`;
-          if(d.entryOrderOverride[key] == null) d.entryOrderOverride[key] = min;
-        });
-      }
-      d._migrations.mergeExpenseOrderOverride = true;
-    }
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1841,11 +1822,40 @@
   // 교통비(버스/지하철/택시 등)는 이동수단 이름으로 문장에 활용하기 위해 구분해둔다(제외하지는 않음 —
   // 방문지 목록에는 그대로 남고, 일기 문장에서는 이동 구간의 실제 교통편 이름으로 우선 사용된다).
   const TRANSIT_CATEGORIES = new Set(['교통']);
+  function hhmmToMin(hhmm){
+    if(!hhmm) return null;
+    const [h,m] = hhmm.split(':').map(Number);
+    return h*60+m;
+  }
+  // 지출내역·일자별요약(방문지 목록·일기)이 함께 따르는 단 하나의 시간순 배치. 기본은 입력한 순서를 그대로
+  // 지키는 것 — 시각을 모르는 지출끼리는 절대 서로 순서가 바뀌지 않는다(입력 인덱스가 그대로 순서를 결정).
+  // 카드승인시각(e.time)이 찍힌 지출만 그 실제 시각 기준으로 자리가 바뀐다. GPS 방문시각이 있으면 그걸로 하루의
+  // 대략적인 시간 범위를 잡아, 시각 모르는 지출들의 "입력 순서"를 그 범위 위에 고르게 펼쳐서 GPS 방문지·시각
+  // 확인된 지출과 나란히 놓을 위치만 정한다(입력순서 자체는 절대 바꾸지 않음). 지출내역 리스트는 이 결과로
+  // 정렬해서 보여주고, 일자별요약도 반드시 이 결과를 그대로 따른다 — 수동 순서 보정(▲▼) 없이 이 계산 하나가
+  // 두 화면 모두의 유일한 기준이 된다.
+  function computeDayExpenseChronOrder(trip, dateStr){
+    const gpsMins = computeDaySpots(trip, dateStr).map(v => hhmmToMin(v.startTime)).filter(m => m != null);
+    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr)
+      .map((e, idx) => ({ ...e, _idx: idx, _realMin: hhmmToMin(e.time) }));
+    const timedMins = dayExps.map(e => e._realMin).filter(m => m != null);
+    const anchorMins = [...gpsMins, ...timedMins];
+    const n = dayExps.length;
+    const dayStart = anchorMins.length ? Math.min(...anchorMins) - 30 : 0;
+    const dayEnd = anchorMins.length ? Math.max(...anchorMins) + 30 : n;
+    return dayExps
+      .map(e => {
+        if(e._realMin != null) return { ...e, _min: e._realMin };
+        const min = n > 1 ? dayStart + (dayEnd - dayStart) * (e._idx / (n-1)) : (dayStart + dayEnd) / 2;
+        return { ...e, _min: min };
+      })
+      .sort((a,b) => a._min - b._min);
+  }
   function computeDayExpenseEntries(trip, dateStr){
-    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr);
+    const dayExpsOrdered = computeDayExpenseChronOrder(trip, dateStr);
     const entries = [];
     const groupIndex = {};
-    dayExps.forEach((e, idx) => {
+    dayExpsOrdered.forEach(e => {
       const tier = expenseTier(e);
       const label = expenseDisplayName(e);
       // 시각을 모르는(순서 추정) 항목끼리 같은 이름+카테고리가 겹치면(예: 가족 3인분 동일 구매) 한 줄로 묶어서
@@ -1855,91 +1865,31 @@
         if(groupIndex[key] != null){
           const g = entries[groupIndex[key]];
           g.count += 1; g.amountKrw += e.amountKrw;
+          g._min = Math.min(g._min, e._min);
           return;
         }
         groupIndex[key] = entries.length;
       }
       entries.push({
-        source: 'expense', tier, label, id: e.id, _orderKey: `exp:${e.id}`,
+        source: 'expense', tier, label, id: e.id,
         startTime: e.time || null, endTime: e.time || null, durationMin: null,
         category: e.category, amountKrw: e.amountKrw, item: e.item, count: 1,
-        mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _seq: idx
+        mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _min: e._min
       });
     });
     return entries;
   }
-  function hhmmToMin(hhmm){
-    if(!hhmm) return null;
-    const [h,m] = hhmm.split(':').map(Number);
-    return h*60+m;
-  }
-  function orderOverrideFor(orderKey){
-    return orderKey && data.entryOrderOverride ? data.entryOrderOverride[orderKey] : null;
-  }
-  // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다. 승인시각을 아는 지출과
-  // GPS 방문지는 원래 실제 시각 순서로 놓이지만, 사용자가 ▲▼로 직접 순서를 보정했으면(entryOrderOverride) 그
-  // 표시 순서를 그대로 따른다 — 단, 실제 GPS 시각(startTime) 자체는 바뀌지 않으므로 이동수단·소요시간 계산은
-  // 영향받지 않는다. 시각을 모르는(순서 추정) 지출은 이미 배치된 항목들 사이의 "바로 이웃한 두 시각" 사이로
-  // 보간해 배치한다(마찬가지로 직접 보정값이 있으면 그걸 그대로 쓴다).
+  // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다. 두 쪽 모두 위
+  // computeDayExpenseChronOrder가 매긴 _min을 그대로 쓰므로(GPS는 실제 startTime), 별도의 순서 계산 없이
+  // 정렬만 하면 지출내역과 항상 같은 순서가 된다.
   function computeDayTimeline(trip, dateStr){
     const gpsSpots = computeDaySpots(trip, dateStr).map(v => ({
       source:'gps', tier:'gps', label:v.label, startTime:v.startTime, endTime:v.endTime,
-      durationMin:v.durationMin, lat:v.lat, lng:v.lng,
-      _orderKey: (v.lat!=null && v.lng!=null) ? `gps:${coordKey(v.lat,v.lng)}` : null,
+      durationMin:v.durationMin, lat:v.lat, lng:v.lng, _min: hhmmToMin(v.startTime),
       mapUrl:(v.lat!=null&&v.lng!=null)?`https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`:''
     }));
     const expEntries = computeDayExpenseEntries(trip, dateStr);
-    const timed = expEntries.filter(e => e.startTime);
-    const untimed = expEntries.filter(e => !e.startTime);
-    const anchors = [...gpsSpots, ...timed]
-      .map(e => {
-        const realMin = hhmmToMin(e.startTime);
-        const override = orderOverrideFor(e._orderKey);
-        return { ...e, _min: (override != null ? override : realMin), _realMin: realMin };
-      })
-      .sort((a,b) => a._min - b._min);
-    // 순서추정 항목은 "그날 전체 시간대"에 통째로 비율 배치하면 중간에 낀 다른 실제 방문지(GPS 앵커)를
-    // 건너뛰어버릴 수 있다(예: 공항 도착 이전 지출과 공항 도착 이후 지출이 뒤섞여 순서가 꼬임) — 그래서 이미
-    // 배치된 항목들 사이의 "바로 이웃한 두 시각" 사이로만 보간해, 앵커가 늘어날수록 점점 더 정확한 구간에 놓이도록 한다.
-    const seq = anchors.slice();
-    untimed.forEach((u, i) => {
-      const override = orderOverrideFor(u._orderKey);
-      if(override != null){
-        u._min = override;
-      }else{
-        const ratio = (i+1) / (untimed.length+1);
-        const insertAt = Math.min(seq.length, Math.round(ratio * seq.length));
-        const prev = seq[insertAt-1], next = seq[insertAt];
-        const prevMin = prev ? prev._min : (next ? next._min - 60 : 0);
-        const nextMin = next ? next._min : (prevMin + 60);
-        u._min = (prevMin + nextMin) / 2;
-      }
-      let idx = seq.findIndex(x => x._min > u._min);
-      if(idx === -1) idx = seq.length;
-      seq.splice(idx, 0, u);
-    });
-    return seq;
-  }
-  // 지출내역 리스트도 위 "방문 순서"(entries)와 같은 순서로 보여준다. 순서추정 지출은 같은 이름끼리 하나의
-  // entry로 묶여 있으므로(예: 공항버스 ×3), 그 묶음의 대표 entry가 배치된 위치를 형제 지출들도 그대로 따르게 한다.
-  function computeDayExpenseOrder(trip, dateStr, entries){
-    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr);
-    const posById = {};
-    const posByGroupKey = {};
-    entries.forEach((en, i) => {
-      if(en.source !== 'expense') return;
-      posById[en.id] = i;
-      if(en.tier === 'order') posByGroupKey[`${en.category}|${en.label}`] = i;
-    });
-    return dayExps
-      .map((e, idx) => {
-        let pos = posById[e.id];
-        if(pos == null && expenseTier(e) === 'order') pos = posByGroupKey[`${e.category}|${expenseDisplayName(e)}`];
-        if(pos == null) pos = entries.length + idx;
-        return { e, pos, idx };
-      })
-      .sort((a,b) => (a.pos - b.pos) || (a.idx - b.idx))
-      .map(x => x.e);
+    return [...gpsSpots, ...expEntries].sort((a,b) => a._min - b._min);
   }
   const MOVEMENT_MENTION_MIN = 15; // 이보다 짧은 이동은 문장에서 생략하고 다음 장소 문장에 자연스럽게 흡수한다
   // GPS 기록상 "도보/버스/비행기 등 이동" 활동만 이어지는 구간(그 사이 확인된 방문지가 없는 구간)을
@@ -1989,15 +1939,6 @@
       const timeRange = v.startTime ? (v.endTime && v.endTime !== v.startTime ? `${v.startTime}~${v.endTime}` : v.startTime) : '';
       const durLabel = [dur, timeRange].filter(Boolean).join(' · ');
       const editBtn = isGps ? `<button type="button" class="spot-editbtn" data-rename-spot data-lat="${v.lat}" data-lng="${v.lng}" data-name="${escapeHtml(v.label || '')}" title="장소 이름 수정">✏️</button>` : '';
-      // 자동 배치 순서가 틀릴 수 있어서(특히 시각을 모르는 항목), 모든 항목을 ▲▼로 순서를 직접 보정할 수 있게 한다.
-      let reorderHtml = '';
-      if(v._orderKey){
-        const upTarget = i > 0 ? (entries[i-1]._min - 1) : null;
-        const downTarget = i < entries.length-1 ? (entries[i+1]._min + 1) : null;
-        const upBtn = upTarget != null ? `<button type="button" class="spot-orderbtn" data-order-move data-order-key="${escapeHtml(v._orderKey)}" data-target-min="${upTarget}" title="한 칸 앞으로">▲</button>` : '';
-        const downBtn = downTarget != null ? `<button type="button" class="spot-orderbtn" data-order-move data-order-key="${escapeHtml(v._orderKey)}" data-target-min="${downTarget}" title="한 칸 뒤로">▼</button>` : '';
-        reorderHtml = `<span class="spot-reorder">${upBtn}${downBtn}</span>`;
-      }
       const nameHtml = v.mapUrl
         ? `<a class="spot-name${isNamed?'':' spot-unnamed'}" href="${escapeHtml(v.mapUrl)}" target="_blank" rel="noopener">${escapeHtml(displayName)}</a>`
         : `<span class="spot-name${isNamed?'':' spot-unnamed'}">${escapeHtml(displayName)}</span>`;
@@ -2006,13 +1947,12 @@
         ${nameHtml}
         <span class="spot-tagbadge">${tierLabel[v.tier]||''}</span>
         ${editBtn}
-        ${reorderHtml}
         <span class="spot-dur tabular">${escapeHtml(durLabel)}</span>
       </div>`;
     }).join('');
     return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (방문 순서)</div>
       <div class="spot-list">${rows}</div>
-      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · GPS 방문지는 탭하면 구글 지도로 이동(✏️로 이름 수정 가능) · 지출 항목은 상호명/구글지도 주소·카드승인시각이 있을수록 정확도가 올라가요 · 자동 배치된 순서가 실제와 다르면 ▲▼로 언제든 직접 바로잡을 수 있어요</div>`;
+      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · GPS 방문지는 탭하면 구글 지도로 이동(✏️로 이름 수정 가능) · 지출 항목은 상호명/구글지도 주소·카드승인시각이 있을수록 정확도가 올라가요 · 지출내역과 같은 시간순으로 자동 정렬돼요</div>`;
   }
 
   // ---------- 하루 일기 문단 자동 생성(3인칭 존댓말) — 방문지 + 실제 이동수단·소요시간을 시간순으로 엮는다 ----------
@@ -2020,6 +1960,16 @@
     '식사': '식사하셨어요', '음료': '음료를 즐기셨어요', '투어': '투어에 참여하셨어요',
     '숙소': '머무르셨어요', '교통': '이동하셨어요', '기타': '들르셨어요'
   };
+  // 카테고리는 '식사'로 찍혀 있어도 실제 구매 품목이 음료·주류면("콜라,레드불,하이네켄" 같은 편의점 구매 등)
+  // "~에서 식사하셨어요"가 어색해서, 품목명에 이런 키워드가 있으면 동사만 음료 쪽으로 바꿔준다(카테고리
+  // 데이터 자체는 그대로 두고 일기 문장의 동사 선택에만 반영).
+  const BEVERAGE_KEYWORDS = ['콜라','사이다','맥주','생수','와인','하이네켄','칼스버그','버드와이저','레드불','커피','아메리카노','라떼','음료수','주스'];
+  function diaryVerbFor(v){
+    if(v.category === '식사' && BEVERAGE_KEYWORDS.some(k => (v.label||'').includes(k) || (v.item||'').includes(k))){
+      return '음료를 구매하셨어요';
+    }
+    return CATEGORY_VISIT_VERB[v.category] || '들르셨어요';
+  }
   function timeOfDayWord(hhmm){
     if(!hhmm) return '';
     const h = Number(hhmm.split(':')[0]);
@@ -2044,10 +1994,13 @@
   // 그 구간 안에 교통비 지출(순서추정이라도)이 끼어 있으면 그 지출의 실제 이름(예: "영국지하철")을 이동수단으로
   // 우선 쓰고, 없으면 구글 타임라인이 감지한 이동수단(비행기/도보 등)을 쓴다 — 어느 쪽도 없으면 "이동"이라고만 한다.
   // 이렇게 이동수단으로 이미 쓰인 지출은 뒤에서 "OO에서 이동하셨어요"로 또 서술하지 않는다(중복 방지).
+  // 문장으로 서술할 접속사 목록 — 4개 순환 대신 좀 더 다양하게 돌려써서 반복이 덜 도드라지게 한다.
+  const DIARY_CONNECTORS = ['이어서', '그다음엔', '그 뒤', '이후', '뒤이어', '그러고 나서', '곧이어', '얼마 후'];
   function dayDiaryText(trip, dateStr, entries, movements){
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     if(!entries.length && !exps.length) return '';
-    const connectors = ['이어서', '그다음엔', '그 뒤', '이후'];
+    let connectorSeq = 0;
+    const nextConnector = () => DIARY_CONNECTORS[(connectorSeq++) % DIARY_CONNECTORS.length];
     const sentences = [];
     const anchorIdx = entries.map((e,i) => (e.source === 'gps' || e.tier === 'time') ? i : -1).filter(i => i >= 0);
     const consumed = new Set();
@@ -2079,31 +2032,55 @@
       if(!trustworthy) return;
       (movementsByIdx[m.insertBeforeIdx] = movementsByIdx[m.insertBeforeIdx] || []).push(m);
     });
+    // 실제 "장소"라고 부를 만한 항목(GPS로 확인된 방문지, 또는 상호명·주소가 확인된 지출)만 "OO에서 ~하셨어요"로
+    // 문장을 만든다. 장소 정보가 전혀 없는 지출(순서추정 등)은 그 이름을 장소처럼 서술하면 부자연스러우므로
+    // (예: "수신기대여료에서 투어에 참여하셨어요") 개별 문장을 만들지 않는다 — 다만 그게 하루의 첫 항목이면
+    // 다음에 실제로 만들어지는 첫 문장(장소든 이동이든) 앞에 자연스러운 도입구("OO로 하루를 시작해")로만
+    // 살짝 얹어주고, 그 외에는 조용히 생략한 채 마지막 지출 총계 문장의 건수·금액에만 반영한다.
+    const hasRealPlace = v => v.source === 'gps' || v.tier === 'addr';
+    let pendingLeadIn = '';
+    let narratedPlaceCount = 0;
     const emitMovement = m => {
-      const lead = sentences.length === 0 ? timeOfDayWord(m.startTime) : connectors[(sentences.length-1) % connectors.length];
+      let lead;
+      if(sentences.length === 0){
+        lead = pendingLeadIn || timeOfDayWord(m.startTime);
+        pendingLeadIn = '';
+      }else{
+        lead = nextConnector();
+      }
       const durNote = m.durationMin >= 60 ? ` ${formatDuration(m.durationMin)} 정도` : '';
       sentences.push(`${lead} ${m.modeLabel}${josaRo(m.modeLabel)}${durNote} 이동하셨어요`.replace(/\s+/g,' ').trim());
     };
     entries.forEach((v, i) => {
       (movementsByIdx[i] || []).forEach(emitMovement);
       if(consumed.has(i)) return; // 이동수단 이름으로 이미 언급된 지출은 별도 문장으로 다시 서술하지 않는다
+      if(!hasRealPlace(v)){
+        if(sentences.length === 0 && !pendingLeadIn){
+          pendingLeadIn = `${v.label}${josaRo(v.label)} 하루를 시작해`;
+        }
+        return;
+      }
+      narratedPlaceCount++;
       const lead = sentences.length === 0
-        ? `${timeOfDayWord(v.startTime)}${v.startTime ? ' '+v.startTime : ''}`.trim()
-        : connectors[(sentences.length-1) % connectors.length];
+        ? (pendingLeadIn || `${timeOfDayWord(v.startTime)}${v.startTime ? ' '+v.startTime : ''}`).trim()
+        : nextConnector();
+      pendingLeadIn = '';
       const countNote = v.count > 1 ? ` ${v.count}건` : '';
       if(v.source === 'gps'){
         const dur = v.durationMin != null ? ` ${formatDuration(v.durationMin)} 정도` : '';
-        sentences.push(`${lead} ${v.label || '어느 장소'}에서${dur} 머무르셨어요`);
+        sentences.push(`${lead} ${v.label || '어느 장소'}에서${dur} 머무르셨어요`.replace(/\s+/g,' ').trim());
       }else{
-        const verb = CATEGORY_VISIT_VERB[v.category] || '들르셨어요';
-        sentences.push(`${lead} ${v.label}에서${countNote} ${verb}`);
+        sentences.push(`${lead} ${v.label}에서${countNote} ${diaryVerbFor(v)}`.replace(/\s+/g,' ').trim());
       }
     });
     (movementsByIdx[entries.length] || []).forEach(emitMovement);
+    // 하루 전체가 장소 없는 지출뿐이었던 드문 경우, 도입구만이라도 문장으로 남긴다.
+    if(pendingLeadIn && !sentences.length){
+      sentences.push(`${pendingLeadIn} 하루를 보내셨어요`.replace(/\s+/g,' ').trim());
+    }
     if(exps.length){
       const total = exps.reduce((s,e)=>s+e.amountKrw,0);
-      const placeCount = entries.length - consumed.size;
-      sentences.push(`오늘 하루 ${placeCount}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
+      sentences.push(`오늘 하루 ${narratedPlaceCount}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
     }
     if(!sentences.length) return '';
     return sentences.join('. ') + '.';
@@ -2119,7 +2096,7 @@
     const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const note = day ? (day.note || '') : '';
 
-    const sortedExps = computeDayExpenseOrder(trip, dateStr, entries);
+    const sortedExps = computeDayExpenseChronOrder(trip, dateStr);
     const expenseListHtml = exps.length ? `<div class="day-explist">${sortedExps.map(e => `
       <div class="day-expitem">
         <span class="day-expcat" style="--tagc:${tagColor(data.categories, e.category)}">${escapeHtml(e.category)}</span>
@@ -3036,20 +3013,6 @@
     const input = prompt('이 장소의 실제 이름을 입력해주세요 (비워두고 확인하면 자동인식 결과로 되돌아갑니다)', current);
     if(input === null) return;
     setPlaceNameOverride(lat, lng, input.trim());
-    renderItineraryTab();
-  });
-
-  // ---------- 일자별 요약: 방문 순서 직접 보정(▲▼) — GPS/지출 항목 모두 대상 ----------
-  el('itineraryDays').addEventListener('click', e => {
-    const btn = e.target.closest('[data-order-move]');
-    if(!btn) return;
-    e.preventDefault();
-    const orderKey = btn.dataset.orderKey;
-    const targetMin = parseFloat(btn.dataset.targetMin);
-    if(!orderKey || Number.isNaN(targetMin)) return;
-    if(!data.entryOrderOverride) data.entryOrderOverride = {};
-    data.entryOrderOverride[orderKey] = targetMin;
-    saveData(data);
     renderItineraryTab();
   });
 
