@@ -1819,13 +1819,35 @@
     if(e.time) return 'time';
     return 'order';
   }
+  // 교통비(버스/지하철/택시 등)는 "머문 장소"가 아니라 이동 그 자체이므로(GPS의 activity 기록과 같은 성격)
+  // 방문지 목록·일기에서는 제외한다 — 지출내역(전체 내역)에는 그대로 남아 있어 정산에는 영향 없다.
+  const NON_VISIT_CATEGORIES = new Set(['교통']);
   function computeDayExpenseEntries(trip, dateStr){
-    return tripExpenses(trip.id).filter(e => e.date === dateStr).map((e, idx) => ({
-      source: 'expense', tier: expenseTier(e), label: expenseDisplayName(e),
-      startTime: e.time || null, endTime: e.time || null, durationMin: null,
-      category: e.category, amountKrw: e.amountKrw, item: e.item,
-      mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _seq: idx
-    }));
+    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr && !NON_VISIT_CATEGORIES.has(e.category));
+    const entries = [];
+    const groupIndex = {};
+    dayExps.forEach((e, idx) => {
+      const tier = expenseTier(e);
+      const label = expenseDisplayName(e);
+      // 시각을 모르는(순서 추정) 항목끼리 같은 이름+카테고리가 겹치면(예: 가족 3인분 동일 구매) 한 줄로 묶어서
+      // "OO에서 X했어요"가 기계적으로 여러 번 반복되지 않게 한다. 시각이 찍힌 항목은 서로 다른 방문일 수 있어 그대로 둔다.
+      if(tier === 'order'){
+        const key = `${e.category}|${label}`;
+        if(groupIndex[key] != null){
+          const g = entries[groupIndex[key]];
+          g.count += 1; g.amountKrw += e.amountKrw;
+          return;
+        }
+        groupIndex[key] = entries.length;
+      }
+      entries.push({
+        source: 'expense', tier, label,
+        startTime: e.time || null, endTime: e.time || null, durationMin: null,
+        category: e.category, amountKrw: e.amountKrw, item: e.item, count: 1,
+        mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _seq: idx
+      });
+    });
+    return entries;
   }
   // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다.
   // 승인시각을 아는 지출은 정확한 위치에, 모르는 지출은 그날 지출 입력 순서 비율에 맞춰 사이사이에 나눠 끼운다.
@@ -1877,23 +1899,23 @@
     flush();
     return gaps;
   }
-  // 공백 구간 중 승인시각이 알려진 지출이 있으면 "일부는 확인됐다"고 표시할 근거로 쓴다(순서만 추정한 지출은 정확한 시각을 모르므로 제외)
-  function annotateGapsWithExpenses(gaps, expEntries){
+  // 공백 구간(gap)이 통합 타임라인(entries) 안에서 어디에 걸리는지 찾아, 정확한 시각을 아는 항목(GPS 방문지·
+  // 카드승인시각이 찍힌 지출) 사이의 "경계 인덱스"를 계산한다. 그 경계 사이에 낀 항목(시각을 모르는 지출 포함)은
+  // 이 공백 구간 안에서 일어난 일로 보고 일기에 자연스럽게 이어 붙인다 — "장소는 알지만 정확한 동선은 모른다"를
+  // "아예 아무 기록도 없다"처럼 모순되게 말하지 않기 위함이다.
+  function annotateGapsWithEntries(gaps, entries){
+    const anchors = entries
+      .map((e,i) => ({ i, t: e.source === 'gps' ? e.startTime : (e.tier === 'time' ? e.startTime : null) }))
+      .filter(a => a.t);
     return gaps.map(g => {
-      const named = expEntries.filter(e => e.startTime && e.startTime >= g.startTime && e.startTime < g.endTime).map(e => e.label);
-      return { ...g, explainedBy: named };
+      let beforeIdx = -1, afterIdx = entries.length;
+      anchors.forEach(a => {
+        if(a.t <= g.startTime) beforeIdx = Math.max(beforeIdx, a.i);
+        if(a.t >= g.endTime) afterIdx = Math.min(afterIdx, a.i);
+      });
+      const within = entries.slice(beforeIdx + 1, afterIdx).filter(e => e.source !== 'gps');
+      return { ...g, insertBeforeIdx: afterIdx, explainedBy: within.map(e => e.label) };
     });
-  }
-  function dayGapHtml(gaps){
-    if(!gaps.length) return '';
-    return gaps.map(g => {
-      const dur = formatDuration(g.durationMin);
-      const timeRange = `${g.startTime}~${g.endTime}`;
-      if(g.explainedBy && g.explainedBy.length){
-        return `<div class="day-gap">⏳ <b>${timeRange}</b>(${dur}) 대부분은 정확한 위치가 남아있지 않지만, 이 중 <b>${escapeHtml(g.explainedBy.join(', '))}</b>은(는) 지출 기록으로 확인했어요.</div>`;
-      }
-      return `<div class="day-gap">⏳ <b>${timeRange}</b>(${dur})은 이동 기록만 남아있어 정확히 어디였는지는 확인이 어려워요.</div>`;
-    }).join('');
   }
 
   // ---------- 방문 스팟(GPS+지출) 랭킹 리스트 — 신뢰도 등급을 배지로 함께 표시 ----------
@@ -1904,7 +1926,8 @@
     const rows = entries.map((v,i) => {
       const isGps = v.source === 'gps';
       const isNamed = !!v.label;
-      const displayName = v.label || (isGps && v.lat!=null ? (hasCachedLookup(v.lat, v.lng) ? '이름 미확인 장소' : '위치 확인 중…') : '이름 미확인');
+      const displayName = (v.label || (isGps && v.lat!=null ? (hasCachedLookup(v.lat, v.lng) ? '이름 미확인 장소' : '위치 확인 중…') : '이름 미확인'))
+        + (v.count > 1 ? ` ×${v.count}` : '');
       const dur = v.durationMin != null ? formatDuration(v.durationMin) : '';
       const timeRange = v.startTime ? (v.endTime && v.endTime !== v.startTime ? `${v.startTime}~${v.endTime}` : v.startTime) : '';
       const durLabel = [dur, timeRange].filter(Boolean).join(' · ');
@@ -1940,28 +1963,39 @@
     if(h < 21) return '저녁 무렵';
     return '밤';
   }
+  // 공백 구간(gap)을 그 시간대에 실제로 해당하는 항목 "바로 뒤"에 끼워 넣어, 이미 알고 있는 사실(예: 투어를
+  // 다녀온 것)과 "정확한 동선까지는 모른다"는 안내가 한 문단 안에서 자연스럽게 이어지도록 한다. 그 구간 안에
+  // 낀 항목이 있으면(explainedBy) "기록이 전혀 없다"고 단정하지 않고 그 항목을 근거로 완곡하게 표현한다.
   function dayDiaryText(trip, dateStr, entries, gaps){
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     if(!entries.length && !exps.length) return '';
     const connectors = ['이어서', '그다음엔', '그 뒤', '이후'];
     const sentences = [];
+    const gapsByIdx = {};
+    gaps.forEach(g => { (gapsByIdx[g.insertBeforeIdx] = gapsByIdx[g.insertBeforeIdx] || []).push(g); });
+    const emitGap = g => {
+      // explainedBy(그 구간 안에 낀 지출 항목)가 있으면 이미 바로 앞 문장들에서 그 항목을 그대로 언급했으므로
+      // 여기서 이름을 반복하지 않는다 — "OO 들르셨어요. 근데 사실 OO 말고는 모른다"처럼 같은 말을 두 번 하는
+      // 대신, 정말 아무 근거도 없을 때만 "동선 기록이 없다"고 안내한다.
+      if(g.explainedBy && g.explainedBy.length) return;
+      const timeRange = `${g.startTime}~${g.endTime}`;
+      sentences.push(`${timeRange} 사이는 정확한 동선 기록이 남아있지 않아요`);
+    };
     entries.forEach((v, i) => {
-      const lead = i === 0
+      (gapsByIdx[i] || []).forEach(emitGap);
+      const lead = sentences.length === 0
         ? `${timeOfDayWord(v.startTime)}${v.startTime ? ' '+v.startTime : ''}`.trim()
-        : connectors[(i-1) % connectors.length];
+        : connectors[(sentences.length-1) % connectors.length];
+      const countNote = v.count > 1 ? ` ${v.count}건` : '';
       if(v.source === 'gps'){
         const dur = v.durationMin != null ? ` ${formatDuration(v.durationMin)} 정도` : '';
         sentences.push(`${lead} ${v.label || '어느 장소'}에서${dur} 머무르셨어요`);
       }else{
         const verb = CATEGORY_VISIT_VERB[v.category] || '들르셨어요';
-        sentences.push(`${lead} ${v.label}에서 ${verb}`);
+        sentences.push(`${lead} ${v.label}에서${countNote} ${verb}`);
       }
     });
-    gaps.forEach(g => {
-      if(!g.explainedBy || !g.explainedBy.length){
-        sentences.push(`${g.startTime}~${g.endTime} 사이는 정확한 동선 기록이 남아있지 않아요`);
-      }
-    });
+    (gapsByIdx[entries.length] || []).forEach(emitGap);
     if(exps.length){
       const total = exps.reduce((s,e)=>s+e.amountKrw,0);
       sentences.push(`오늘 하루 ${entries.length}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
@@ -1975,7 +2009,7 @@
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     const gpsSpots = computeDaySpots(trip, dateStr);
     const entries = computeDayTimeline(trip, dateStr);
-    const gaps = annotateGapsWithExpenses(computeDayGaps(trip, dateStr, gpsSpots), computeDayExpenseEntries(trip, dateStr));
+    const gaps = annotateGapsWithEntries(computeDayGaps(trip, dateStr, gpsSpots), entries);
     const diary = dayDiaryText(trip, dateStr, entries, gaps);
     const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const note = day ? (day.note || '') : '';
@@ -1987,7 +2021,6 @@
         <span class="day-expamt tabular">${won(e.amountKrw)}</span>
       </div>`).join('')}</div>` : '<div class="itin-empty-note">이 날짜에 등록된 지출이 없어요</div>';
 
-    const gapHtml = dayGapHtml(gaps);
     const spotListHtml = daySpotListHtml(entries);
     const routeHtml = dayTimelineHtml(trip, dateStr);
 
@@ -1997,7 +2030,6 @@
         <span class="itin-daydate">${dateStr.slice(5).replace('-','.')}</span>
       </div>
       ${diary ? `<div class="day-diary">${escapeHtml(diary)}</div>` : ''}
-      ${gapHtml}
       ${spotListHtml}
       ${expenseListHtml}
       ${routeHtml}
