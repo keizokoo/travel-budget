@@ -620,7 +620,7 @@
             <input type="number" id="newAmount" placeholder="금액" min="0" step="1">
           </div>
           <div class="item-receipt-row">
-            <input type="text" id="newItem" placeholder="지출 항목" list="itemSuggestions">
+            <input type="text" id="newItem" placeholder="지출 항목" autocomplete="off">
             <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
             <button type="button" class="receiptbtn" id="newReceiptBtn" title="영수증 사진 추가">📷</button>
           </div>
@@ -649,7 +649,6 @@
           </div>
         </div>
       </div>
-      <datalist id="itemSuggestions"></datalist>
     </div>
 
     <div class="toolbar">
@@ -1314,15 +1313,6 @@
     `).join('');
   }
 
-  function renderItemSuggestions(){
-    const seen = new Set();
-    const items = [];
-    data.expenses.slice().sort((a,b)=> b.date.localeCompare(a.date)).forEach(e => {
-      if(!seen.has(e.item)){ seen.add(e.item); items.push(e.item); }
-    });
-    el('itemSuggestions').innerHTML = items.slice(0,25).map(i => `<option value="${escapeHtml(i)}">`).join('');
-  }
-
   // ---------- 필터/정렬 ----------
   let searchTerm = '';
   let filterCategories = new Set();
@@ -1434,7 +1424,6 @@
     `;
   }
 
-  // ---------- 자주 쓰는 지출 항목 ----------
   // ---------- 일자 라벨 ----------
   function dayInfo(trip, dateStr){
     if(!trip.startDate) return { label: dateStr, isNumbered:false };
@@ -1688,7 +1677,6 @@
     renderChips();
     renderBudgetRows();
     renderFilterChips();
-    renderItemSuggestions();
     renderStorageUsage();
     renderBackupSettings();
 
