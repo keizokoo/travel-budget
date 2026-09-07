@@ -182,6 +182,11 @@
     font-size:12.5px; font-weight:700; color:var(--ink2);
     background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
   }
+  .erow .map-link{
+    display:inline-flex; align-items:center; gap:4px; text-decoration:none;
+    font-size:12.5px; font-weight:700; color:var(--good);
+    background:var(--bg); border:1px solid var(--good); border-radius:999px; padding:3px 10px 3px 8px;
+  }
   .miniicon{ background:none; border:none; color:var(--ink2); font-size:12px; padding:2px 3px; border-radius:6px; }
   .miniicon:hover{ color:var(--ink); background:var(--line); }
   .erow .expand .memo{ font-size:11px; color:var(--ink2); width:100%; }
@@ -231,6 +236,15 @@
     font-size:12.5px; font-weight:600; color:var(--ink); background:var(--bg);
     border:1px solid var(--line2); border-radius:9px; padding:9px 11px; margin-bottom:10px; line-height:1.5;
   }
+  .day-diary{
+    font-size:12.5px; color:var(--ink); background:var(--bg);
+    border:1px solid var(--line2); border-radius:9px; padding:10px 12px; margin-bottom:10px; line-height:1.7;
+  }
+  .day-gap{
+    font-size:11.5px; color:var(--ink2); background:var(--bg);
+    border:1px dashed var(--line2); border-radius:9px; padding:8px 10px; margin-bottom:10px; line-height:1.6;
+  }
+  .day-gap b{ color:var(--ink); }
   .day-explist{ display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
   .day-expitem{ display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px solid var(--line); font-size:12px; }
   .day-expitem:last-child{ border-bottom:none; }
@@ -250,6 +264,7 @@
   .route-place a{ color:var(--ink); text-decoration:none; }
   .route-place a:hover{ color:var(--accent); }
   .route-activity{ color:var(--ink3); font-style:italic; }
+  .route-place.route-dup{ color:var(--ink3); font-size:11px; font-style:italic; }
   .route-warn{ cursor:help; }
   .route-pending{ color:var(--ink3); font-style:italic; }
 
@@ -271,6 +286,15 @@
   .spot-editbtn:hover{ opacity:1; }
   .spot-dur{ flex-shrink:0; font-size:11.5px; color:var(--ink2); text-align:right; }
   .spot-attrib{ font-size:10.5px; color:var(--ink3); margin:2px 0 10px; }
+  /* 지출 기반 방문지의 신뢰도 등급 표시 — 주소로 확인됨(실선, 강조색 테두리) / 승인시각만(점선) / 순서만 추정(옅은 점선) */
+  .spot-chip.addr{ border-color:var(--good); }
+  .spot-chip.est-time{ border-style:dashed; }
+  .spot-chip.est-order{ border-style:dashed; opacity:.82; }
+  .spot-tagbadge{
+    flex-shrink:0; font-size:9.5px; font-weight:700; color:var(--ink3);
+    background:var(--surface); border:1px solid var(--line2); border-radius:999px; padding:1px 6px;
+  }
+  .spot-chip.addr .spot-tagbadge{ color:var(--good); border-color:var(--good); }
 
   .day-note-wrap{ margin-top:2px; }
   .day-note{
@@ -620,7 +644,16 @@
           </div>
           <div class="memorow">
             <input type="text" id="newMemo" placeholder="메모 (선택)">
-            <button type="button" class="addbtn" id="addExpenseBtn">+ 추가</button>
+          </div>
+          <div class="memorow">
+            <input type="text" id="newPlaceName" placeholder="상호명 (선택)" style="max-width:38%;">
+            <input type="text" id="newPlaceAddr" placeholder="🗺 구글지도 주소/링크 (선택)">
+          </div>
+          <div class="memorow">
+            <input type="text" id="newTime" placeholder="⏱ 시각 HH:MM (카드승인문자 자동인식, 선택)" style="max-width:48%;">
+          </div>
+          <div class="memorow">
+            <button type="button" class="addbtn" id="addExpenseBtn" style="width:100%;">+ 추가</button>
           </div>
         </div>
       </div>
@@ -937,7 +970,69 @@
       if(!d.countries.includes('한국')) d.countries.push('한국');
       d._migrations.addKoreaCountry = true;
     }
+    // 일회성 마이그레이션: 메모에 이미 적어둔 구글지도 링크/주소를 새 "장소(구글지도)" 필드(placeAddr)로 옮긴다.
+    // 링크(맵 URL)가 있으면 그 부분만 뽑아 옮기고 나머지 메모는 그대로 둔다. 링크가 없어도 메모 전체가
+    // 주소로 보이는 패턴(영국 우편번호, 번지+도로명, "OO로/OO길" 등)이면 메모 전체를 주소로 간주해 옮긴다.
+    // 이후 사용자가 placeAddr을 지워도 다시 채우지 않도록 한 번만 실행한다.
+    if(!d._migrations.extractMapAddrFromMemo){
+      (d.expenses||[]).forEach(e => {
+        if(e.placeAddr) return;
+        const memo = (e.memo||'').trim();
+        if(!memo) return;
+        const urlMatch = memo.match(/https?:\/\/\S+/i);
+        if(urlMatch && /maps|goo\.gl/i.test(urlMatch[0])){
+          e.placeAddr = urlMatch[0];
+          const rest = memo.replace(urlMatch[0], '').replace(/^[\s,·\-]+|[\s,·\-]+$/g, '').trim();
+          e.memo = rest;
+          return;
+        }
+        if(looksLikeAddress(memo)){
+          e.placeAddr = memo;
+          e.memo = '';
+        }
+      });
+      d._migrations.extractMapAddrFromMemo = true;
+    }
     return d;
+  }
+  // 문자열이 주소처럼 보이는지 대략 판별(영국 우편번호 / 번지+도로명 / 한국식 "OO로,OO길" 패턴)
+  function looksLikeAddress(s){
+    if(!s || s.length > 120) return false;
+    const ukPostcode = /\b[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2}\b/i;
+    const zipCode = /\b\d{5}(-\d{4})?\b/;
+    const streetWord = /\b\d{1,5}\s+\S.{2,30}\s(St|Street|Rd|Road|Ave|Avenue|Blvd|Lane|Dr|Drive|Way|Court|Place)\b/i;
+    const korRoad = /(로|길)\s?\d/;
+    return ukPostcode.test(s) || zipCode.test(s) || streetWord.test(s) || korRoad.test(s);
+  }
+  // 장소(구글지도) 값을 실제로 열 수 있는 지도 링크로 변환 — 이미 URL이면 그대로, 텍스트 주소면 지도 검색 링크로 감싼다
+  function mapUrlFor(addr){
+    const s = (addr||'').trim();
+    if(!s) return '';
+    if(/^https?:\/\//i.test(s)) return s;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}`;
+  }
+  // 장소(구글지도) 값에서 상호명을 최대한 뽑아낸다 — 구글지도 링크는 보통 "/maps/place/상호명/@좌표..." 형태로
+  // 이름을 경로에 담고 있어 그 부분을 디코딩해서 쓰고, 좌표만 있는 링크거나 이름 부분을 못 찾으면 빈 문자열을 돌려준다.
+  // 링크가 아닌 텍스트 주소는 보통 "상호명, 도로명 주소" 순서로 적기 때문에 콤마 앞부분을 이름으로 본다.
+  function placeNameFromAddr(addr){
+    const s = (addr||'').trim();
+    if(!s) return '';
+    const placeMatch = s.match(/\/maps\/place\/([^/@]+)/i) || s.match(/[?&]q=([^&]+)/i);
+    if(placeMatch){
+      let name = placeMatch[1];
+      try{ name = decodeURIComponent(name); }catch(e){ /* 디코딩 실패 시 원문 그대로 사용 */ }
+      name = name.replace(/\+/g, ' ').trim();
+      // 좌표만 담긴 경우("51.5033,-0.1195")는 이름이 아니므로 제외
+      if(!name || /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(name)) return '';
+      // 링크에 좌표(@lat,lng)가 따로 없는 형태는 구글이 "상호명, 도로명, 도시, 우편번호, 국가"를
+      // 전부 이 한 구간에 콤마로 이어붙여 넣는다(예: "St James's Café, Horse Guards Rd, London SW1A 2BJ 영국") —
+      // 이럴 땐 첫 콤마 앞부분만 실제 상호명이다.
+      if(name.includes(',')) name = name.split(',')[0].trim();
+      return name.slice(0, 40);
+    }
+    if(/^https?:\/\//i.test(s)) return ''; // 이름을 담지 않은 다른 형태의 링크(짧은 공유링크 등)는 추출 불가
+    const firstPart = s.split(',')[0].trim();
+    return (firstPart && firstPart.length <= 40) ? firstPart : '';
   }
 
   function loadData(){
@@ -1377,6 +1472,14 @@
     if(h) return `${h}시간`;
     return `${m}분`;
   }
+  // "HH:MM"에 분을 더한 시각을 반환(자정을 넘어가면 다음날로 감싼다)
+  function addMinutes(hhmm, min){
+    const [h,m] = hhmm.split(':').map(Number);
+    let total = ((h*60+m+min) % 1440 + 1440) % 1440;
+    const hh = String(Math.floor(total/60)).padStart(2,'0');
+    const mm = String(total%60).padStart(2,'0');
+    return `${hh}:${mm}`;
+  }
   function haversineMeters(lat1,lng1,lat2,lng2){
     const R = 6371000;
     const toRad = d => d * Math.PI/180;
@@ -1416,10 +1519,28 @@
       // 좌표가 멀리 떨어져 있어도(구글 타임라인이 같은 실제 방문을 서로 다른 후보 위치로 중복 기록한 경우) 하나의 방문으로 합친다.
       // 시간이 겹치지 않아도 아주 가까운 좌표(SPOT_MERGE_DIST_M 이내)라면 GPS 오차로 갈라진 같은 방문으로 보고 병합한다.
       const match = merged.find(m =>
-        rangesOverlap(m.startTime, m.endTime, v.startTime, v.endTime) ||
-        (haversineMeters(m.lat, m.lng, v.lat, v.lng) <= SPOT_MERGE_DIST_M && Math.abs(minutesBetween(m.endTime, v.startTime) ?? 0) <= 15)
+        !m._split &&
+        (rangesOverlap(m.startTime, m.endTime, v.startTime, v.endTime) ||
+        (haversineMeters(m.lat, m.lng, v.lat, v.lng) <= SPOT_MERGE_DIST_M && Math.abs(minutesBetween(m.endTime, v.startTime) ?? 0) <= 15))
       );
       if(match){
+        // 겹치는 두 후보가 둘 다 이름 품질이 동률로 높고(정확한 장소명) 이름 자체도 서로 다르면,
+        // "같은 방문의 중복 후보"가 아니라 짧게 이어서 다닌 서로 다른 실제 장소일 가능성이 높다고 보고
+        // 하나로 합쳐 한쪽 이름을 지우는 대신, 겹치는 시간을 반으로 나눠 순서대로 둘 다 남긴다.
+        const vQ = placeQuality(v.lat, v.lng), mQ = placeQuality(match.lat, match.lng);
+        const vName = displayPlaceName(v), mName = displayPlaceName(match);
+        const tiedDistinctNames = vQ >= 3 && mQ >= 3 && vQ === mQ && vName && mName && vName !== mName;
+        if(tiedDistinctNames){
+          const start = match.startTime < v.startTime ? match.startTime : v.startTime;
+          const end = match.endTime > v.endTime ? match.endTime : v.endTime;
+          const half = Math.max(1, Math.floor((minutesBetween(start, end) || 2) / 2));
+          const mid = addMinutes(start, half);
+          match.startTime = start; match.endTime = mid;
+          match.durationMin = minutesBetween(match.startTime, match.endTime);
+          match._split = true;
+          merged.push({ ...v, startTime: mid, endTime: end, durationMin: minutesBetween(mid, end), _split: true });
+          return;
+        }
         if(v.startTime < match.startTime) match.startTime = v.startTime;
         if(v.endTime > match.endTime) match.endTime = v.endTime;
         match.durationMin = minutesBetween(match.startTime, match.endTime);
@@ -1643,38 +1764,219 @@
     const dayVisits = bucket.visits.filter(v => v.date === dateStr).sort((a,b)=> (a.startTime||'').localeCompare(b.startTime||''));
     if(!dayVisits.length) return '';
     const openAttr = openRouteDetails.has(dateStr) ? ' open' : '';
+    // 시간이 겹치는 'visit' 원본 후보들을 묶어서, 서로 다른 정확한 이름을 가진 경우(=진짜 다른 곳을 순서대로
+    // 다녀온 경우)는 전부 정식 줄로 보여주고, 그렇지 않은 경우(=같은 방문의 중복 후보)는 이름 품질이 가장
+    // 좋은 것만 정식 줄로 두고 나머지는 그 아래 회색 보조줄("원본 중복 후보")로 접어 보여준다.
+    const shown = new Set();
+    const rows = [];
+    dayVisits.forEach((v, i) => {
+      if(shown.has(i)) return;
+      if(v.kind !== 'visit' || v.lat == null){ rows.push(routeItemHtml(v)); shown.add(i); return; }
+      const group = [i];
+      for(let j=i+1;j<dayVisits.length;j++){
+        if(shown.has(j)) continue;
+        const w = dayVisits[j];
+        if(w.kind === 'visit' && w.lat != null && rangesOverlap(v.startTime, v.endTime, w.startTime, w.endTime)) group.push(j);
+      }
+      group.forEach(gi => shown.add(gi));
+      const items = group.map(gi => dayVisits[gi]);
+      if(items.length === 1){ rows.push(routeItemHtml(items[0])); return; }
+      const qualities = items.map(it => placeQuality(it.lat, it.lng));
+      const maxQ = Math.max(...qualities);
+      const topTied = items.filter((it,idx) => qualities[idx] === maxQ && maxQ >= 3);
+      const distinctNames = new Set(topTied.map(it => displayPlaceName(it)).filter(Boolean));
+      if(topTied.length >= 2 && distinctNames.size >= 2){
+        items.slice().sort((a,b)=> (a.startTime||'').localeCompare(b.startTime||'')).forEach(it => rows.push(routeItemHtml(it)));
+        return;
+      }
+      const sorted = items.slice().sort((a,b) => placeQuality(b.lat,b.lng) - placeQuality(a.lat,a.lng));
+      const [rep, ...dups] = sorted;
+      rows.push(routeItemHtml(rep));
+      const dupNames = dups.map(d => displayPlaceName(d)).filter(Boolean);
+      if(dupNames.length){
+        rows.push(`<div class="route-item"><span class="route-time"></span><span class="route-place route-dup">(원본 중복 후보: ${dupNames.map(n=>escapeHtml(n)).join(', ')})</span></div>`);
+      }
+    });
     return `<details class="day-route" data-route-date="${dateStr}"${openAttr}>
       <summary class="day-route-label">🧭 전체 이동 경로 상세보기</summary>
-      ${dayVisits.map(v => routeItemHtml(v)).join('')}
+      ${rows.join('')}
     </details>`;
   }
 
-  // ---------- 방문 스팟 랭킹 리스트 (체류시간 순, 실제 장소명 반영) ----------
-  function daySpotListHtml(spots){
-    if(!spots.length) return '';
-    const rows = spots.map((v,i) => {
-      const dur = formatDuration(v.durationMin);
-      const timeRange = `${v.startTime}~${v.endTime}`;
-      const mapUrl = `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`;
+  // ---------- 지출을 그날 타임라인에 실제 방문지로 끼워 넣기 (승인시각/상호명/주소 활용) ----------
+  function cleanItemName(item){
+    const s = (item||'').trim();
+    const paren = s.split('(')[0].trim();
+    return paren || s;
+  }
+  function expenseDisplayName(e){
+    return e.placeName || placeNameFromAddr(e.placeAddr) || cleanItemName(e.item);
+  }
+  // 신뢰도 등급: 상호명/주소가 있으면 GPS와 동급인 "확정"에 가깝고, 카드승인시각만 있으면 "시각 추정",
+  // 둘 다 없으면 지출 입력 순서로만 대략 배치하는 "순서 추정"
+  function expenseTier(e){
+    if(e.placeAddr || e.placeName) return 'addr';
+    if(e.time) return 'time';
+    return 'order';
+  }
+  function computeDayExpenseEntries(trip, dateStr){
+    return tripExpenses(trip.id).filter(e => e.date === dateStr).map((e, idx) => ({
+      source: 'expense', tier: expenseTier(e), label: expenseDisplayName(e),
+      startTime: e.time || null, endTime: e.time || null, durationMin: null,
+      category: e.category, amountKrw: e.amountKrw, item: e.item,
+      mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _seq: idx
+    }));
+  }
+  // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다.
+  // 승인시각을 아는 지출은 정확한 위치에, 모르는 지출은 그날 지출 입력 순서 비율에 맞춰 사이사이에 나눠 끼운다.
+  function computeDayTimeline(trip, dateStr){
+    const gpsSpots = computeDaySpots(trip, dateStr).map(v => ({
+      source:'gps', tier:'gps', label:v.label, startTime:v.startTime, endTime:v.endTime,
+      durationMin:v.durationMin, lat:v.lat, lng:v.lng,
+      mapUrl:(v.lat!=null&&v.lng!=null)?`https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`:''
+    }));
+    const expEntries = computeDayExpenseEntries(trip, dateStr);
+    const timed = expEntries.filter(e => e.startTime);
+    const untimed = expEntries.filter(e => !e.startTime);
+    const combined = [...gpsSpots, ...timed].sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+    untimed.forEach((u, i) => {
+      const ratio = (i+1) / (untimed.length+1);
+      const insertAt = Math.min(combined.length, Math.round(ratio * combined.length));
+      combined.splice(insertAt, 0, u);
+    });
+    return combined;
+  }
+  const GAP_FLAG_MIN = 90;
+  // GPS 기록상 "도보/버스 등 이동" 활동만 90분 이상 이어지는데 그 사이 방문지로 확인된 곳이 없는 구간을
+  // "정확한 위치를 알 수 없는 공백"으로 표시한다 — 있지도 않은 장소를 지어내지 않기 위한 정직한 안내다.
+  function computeDayGaps(trip, dateStr, gpsSpots){
+    const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
+    if(!bucket) return [];
+    const dayVisits = bucket.visits.filter(v => v.date === dateStr && v.startTime && v.endTime)
+      .sort((a,b)=> a.startTime.localeCompare(b.startTime));
+    if(!dayVisits.length) return [];
+    const covered = gpsSpots.map(s => [s.startTime, s.endTime]);
+    const isCovered = t => covered.some(([s,e]) => t >= s && t < e);
+    const gaps = [];
+    let curStart = null, curEnd = null;
+    const flush = () => {
+      if(curStart != null){
+        const dur = minutesBetween(curStart, curEnd);
+        if(dur >= GAP_FLAG_MIN) gaps.push({ startTime:curStart, endTime:curEnd, durationMin:dur });
+      }
+      curStart = null; curEnd = null;
+    };
+    dayVisits.forEach(v => {
+      if(v.kind === 'activity' && !isCovered(v.startTime)){
+        if(curStart == null) curStart = v.startTime;
+        curEnd = v.endTime;
+      }else{
+        flush();
+      }
+    });
+    flush();
+    return gaps;
+  }
+  // 공백 구간 중 승인시각이 알려진 지출이 있으면 "일부는 확인됐다"고 표시할 근거로 쓴다(순서만 추정한 지출은 정확한 시각을 모르므로 제외)
+  function annotateGapsWithExpenses(gaps, expEntries){
+    return gaps.map(g => {
+      const named = expEntries.filter(e => e.startTime && e.startTime >= g.startTime && e.startTime < g.endTime).map(e => e.label);
+      return { ...g, explainedBy: named };
+    });
+  }
+  function dayGapHtml(gaps){
+    if(!gaps.length) return '';
+    return gaps.map(g => {
+      const dur = formatDuration(g.durationMin);
+      const timeRange = `${g.startTime}~${g.endTime}`;
+      if(g.explainedBy && g.explainedBy.length){
+        return `<div class="day-gap">⏳ <b>${timeRange}</b>(${dur}) 대부분은 정확한 위치가 남아있지 않지만, 이 중 <b>${escapeHtml(g.explainedBy.join(', '))}</b>은(는) 지출 기록으로 확인했어요.</div>`;
+      }
+      return `<div class="day-gap">⏳ <b>${timeRange}</b>(${dur})은 이동 기록만 남아있어 정확히 어디였는지는 확인이 어려워요.</div>`;
+    }).join('');
+  }
+
+  // ---------- 방문 스팟(GPS+지출) 랭킹 리스트 — 신뢰도 등급을 배지로 함께 표시 ----------
+  function daySpotListHtml(entries){
+    if(!entries.length) return '';
+    const tierLabel = { gps:'GPS', addr:'지출·주소', time:'지출·시각', order:'지출·추정' };
+    const tierClass = { gps:'', addr:' addr', time:' est-time', order:' est-order' };
+    const rows = entries.map((v,i) => {
+      const isGps = v.source === 'gps';
       const isNamed = !!v.label;
-      const displayName = v.label || (hasCachedLookup(v.lat, v.lng) ? '이름 미확인 장소' : '위치 확인 중…');
-      return `<div class="spot-chip">
+      const displayName = v.label || (isGps && v.lat!=null ? (hasCachedLookup(v.lat, v.lng) ? '이름 미확인 장소' : '위치 확인 중…') : '이름 미확인');
+      const dur = v.durationMin != null ? formatDuration(v.durationMin) : '';
+      const timeRange = v.startTime ? (v.endTime && v.endTime !== v.startTime ? `${v.startTime}~${v.endTime}` : v.startTime) : '';
+      const durLabel = [dur, timeRange].filter(Boolean).join(' · ');
+      const editBtn = isGps ? `<button type="button" class="spot-editbtn" data-rename-spot data-lat="${v.lat}" data-lng="${v.lng}" data-name="${escapeHtml(v.label || '')}" title="장소 이름 수정">✏️</button>` : '';
+      const nameHtml = v.mapUrl
+        ? `<a class="spot-name${isNamed?'':' spot-unnamed'}" href="${escapeHtml(v.mapUrl)}" target="_blank" rel="noopener">${escapeHtml(displayName)}</a>`
+        : `<span class="spot-name${isNamed?'':' spot-unnamed'}">${escapeHtml(displayName)}</span>`;
+      return `<div class="spot-chip${tierClass[v.tier]||''}">
         <span class="spot-rank">${i+1}</span>
-        <a class="spot-name${isNamed ? '' : ' spot-unnamed'}" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener">${escapeHtml(displayName)}</a>
-        <button type="button" class="spot-editbtn" data-rename-spot data-lat="${v.lat}" data-lng="${v.lng}" data-name="${escapeHtml(v.label || '')}" title="장소 이름 수정">✏️</button>
-        <span class="spot-dur tabular">${dur} · ${timeRange}</span>
+        ${nameHtml}
+        <span class="spot-tagbadge">${tierLabel[v.tier]||''}</span>
+        ${editBtn}
+        <span class="spot-dur tabular">${escapeHtml(durLabel)}</span>
       </div>`;
     }).join('');
     return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (방문 순서)</div>
       <div class="spot-list">${rows}</div>
-      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · 장소명을 탭하면 구글 지도로 이동, ✏️로 직접 수정할 수 있어요</div>`;
+      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · GPS 방문지는 탭하면 구글 지도로 이동(✏️로 이름 수정 가능) · 지출 항목은 상호명/구글지도 주소·카드승인시각이 있을수록 정확도가 올라가요</div>`;
+  }
+
+  // ---------- 하루 일기 문단 자동 생성(3인칭 존댓말, 방문지+지출을 시간순으로 자연스럽게 엮음) ----------
+  const CATEGORY_VISIT_VERB = {
+    '식사': '식사하셨어요', '음료': '음료를 즐기셨어요', '투어': '투어에 참여하셨어요',
+    '숙소': '머무르셨어요', '교통': '이동하셨어요', '기타': '들르셨어요'
+  };
+  function timeOfDayWord(hhmm){
+    if(!hhmm) return '';
+    const h = Number(hhmm.split(':')[0]);
+    if(h < 6) return '새벽';
+    if(h < 11) return '아침';
+    if(h < 14) return '점심 무렵';
+    if(h < 18) return '오후';
+    if(h < 21) return '저녁 무렵';
+    return '밤';
+  }
+  function dayDiaryText(trip, dateStr, entries, gaps){
+    const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
+    if(!entries.length && !exps.length) return '';
+    const connectors = ['이어서', '그다음엔', '그 뒤', '이후'];
+    const sentences = [];
+    entries.forEach((v, i) => {
+      const lead = i === 0
+        ? `${timeOfDayWord(v.startTime)}${v.startTime ? ' '+v.startTime : ''}`.trim()
+        : connectors[(i-1) % connectors.length];
+      if(v.source === 'gps'){
+        const dur = v.durationMin != null ? ` ${formatDuration(v.durationMin)} 정도` : '';
+        sentences.push(`${lead} ${v.label || '어느 장소'}에서${dur} 머무르셨어요`);
+      }else{
+        const verb = CATEGORY_VISIT_VERB[v.category] || '들르셨어요';
+        sentences.push(`${lead} ${v.label}에서 ${verb}`);
+      }
+    });
+    gaps.forEach(g => {
+      if(!g.explainedBy || !g.explainedBy.length){
+        sentences.push(`${g.startTime}~${g.endTime} 사이는 정확한 동선 기록이 남아있지 않아요`);
+      }
+    });
+    if(exps.length){
+      const total = exps.reduce((s,e)=>s+e.amountKrw,0);
+      sentences.push(`오늘 하루 ${entries.length}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
+    }
+    if(!sentences.length) return '';
+    return sentences.join('. ') + '.';
   }
 
   function itineraryDayCardHtml(trip, dateStr){
     const info = dayInfo(trip, dateStr);
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
-    const spots = computeDaySpots(trip, dateStr);
-    const summary = daySummaryText(exps, spots);
+    const gpsSpots = computeDaySpots(trip, dateStr);
+    const entries = computeDayTimeline(trip, dateStr);
+    const gaps = annotateGapsWithExpenses(computeDayGaps(trip, dateStr, gpsSpots), computeDayExpenseEntries(trip, dateStr));
+    const diary = dayDiaryText(trip, dateStr, entries, gaps);
     const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const note = day ? (day.note || '') : '';
 
@@ -1685,7 +1987,8 @@
         <span class="day-expamt tabular">${won(e.amountKrw)}</span>
       </div>`).join('')}</div>` : '<div class="itin-empty-note">이 날짜에 등록된 지출이 없어요</div>';
 
-    const spotListHtml = daySpotListHtml(spots);
+    const gapHtml = dayGapHtml(gaps);
+    const spotListHtml = daySpotListHtml(entries);
     const routeHtml = dayTimelineHtml(trip, dateStr);
 
     return `<div class="itin-daycard">
@@ -1693,7 +1996,8 @@
         <span class="itin-daytitle">${info.isNumbered ? info.label : dateStr}</span>
         <span class="itin-daydate">${dateStr.slice(5).replace('-','.')}</span>
       </div>
-      ${summary ? `<div class="day-summary">${escapeHtml(summary)}</div>` : ''}
+      ${diary ? `<div class="day-diary">${escapeHtml(diary)}</div>` : ''}
+      ${gapHtml}
       ${spotListHtml}
       ${expenseListHtml}
       ${routeHtml}
@@ -1759,7 +2063,10 @@
     const photoHtml = e.receipt ? `<div class="receipt-thumb"><img src="${e.receipt}" data-photo="${e.id}" alt="영수증"></div>` : '';
     const payHtml = e.paymentMethod === 'card' ? `<span class="pay-badge">💳 카드${e.cardType ? ' · '+escapeHtml(e.cardType) : ''}</span>`
       : e.paymentMethod === 'cash' ? `<span class="pay-badge">💵 현금</span>` : '';
-    const hasExtra = !!(e.memo || e.receipt);
+    // 상호명 표시 우선순위: 직접 입력한 상호명(가장 정확) > 주소/링크에서 자동으로 뽑아낸 이름 > 일반 "지도" 라벨
+    const mapPlaceName = e.placeName || placeNameFromAddr(e.placeAddr);
+    const mapLinkHtml = e.placeAddr ? `<a class="map-link" href="${escapeHtml(mapUrlFor(e.placeAddr))}" target="_blank" rel="noopener">🗺 ${escapeHtml(mapPlaceName || '지도')}</a>` : '';
+    const hasExtra = !!(e.memo || e.receipt || e.placeAddr);
     const expanded = expandedRowIds.has(e.id);
     return `<div class="erow ${expanded ? '' : 'collapsed'}" data-id="${e.id}">
       <div class="swipe-actions"><button class="swipe-del" data-del="${e.id}">🗑 삭제</button></div>
@@ -1775,6 +2082,7 @@
         <div class="expand">
           <span class="country-badge">${countryFlag(e.country)} ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
           ${payHtml}
+          ${mapLinkHtml}
           ${photoHtml}
           ${memoHtml}
           <div class="rowbtns">
@@ -2039,8 +2347,12 @@
         .trim();
     }
     let item = '';
+    let time = null;
     const timeIdx = t.search(/\d{1,2}:\d{2}/);
     if(timeIdx >= 0){
+      // 카드승인 문자의 승인시각(HH:MM)은 실제로 그 장소에 있었던 시각이라, 나중에 "일자별 요약"에서
+      // 지출을 타임라인 상의 정확한 위치에 끼워 넣는 데 쓴다. 여기서 버리지 않고 함께 반환한다.
+      time = t.slice(timeIdx, timeIdx+5);
       let tail = t.slice(timeIdx).replace(/^\d{1,2}:\d{2}/, '').trim();
       item = trimTail(tail);
     }
@@ -2054,7 +2366,7 @@
     for(const c of data.categories){ if(c && t.includes(c)){ category = c; break; } }
 
     if(!krwAmount && !foreignAmount && !item) return null;
-    return { date, item, category, currency, foreignAmount, krwAmount };
+    return { date, item, category, currency, foreignAmount, krwAmount, time };
   }
 
   // parsed 필드를 실제 입력 폼에 채우고, 요약 문구를 돌려준다 (문자 붙여넣기/사진 인식 공용)
@@ -2062,6 +2374,7 @@
     if(parsed.date) el('newDate').value = parsed.date;
     if(parsed.item) el('newItem').value = parsed.item;
     if(parsed.category) el('newCategory').value = parsed.category;
+    if(parsed.time) el('newTime').value = parsed.time;
 
     if(parsed.currency && data.currencies.includes(parsed.currency)){
       el('newCurrency').value = parsed.currency;
@@ -2317,6 +2630,10 @@
     const fxRate = Number(el('newFxRate').value);
     const item = el('newItem').value.trim();
     const memo = el('newMemo').value.trim();
+    const placeAddr = el('newPlaceAddr').value.trim();
+    const placeName = el('newPlaceName').value.trim();
+    const timeRaw = el('newTime').value.trim();
+    const time = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw.padStart(5,'0') : '';
     const paymentMethod = getPaymentMethod();
     const cardType = paymentMethod === 'card' ? el('newCardType').value : null;
 
@@ -2332,13 +2649,13 @@
     data.expenses.push({
       id: uid(), tripId: data.currentTripId, date, category, country, city,
       currency, amountForeign: currency === 'KRW' ? null : amount,
-      amountKrw, item, memo, receipt: pendingReceiptDataUrl,
+      amountKrw, item, memo, placeAddr, placeName, time, receipt: pendingReceiptDataUrl,
       paymentMethod, cardType
     });
     if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
     saveData(data);
 
-    el('newItem').value=''; el('newAmount').value=''; el('newFxRate').value=''; el('newMemo').value=''; el('newCity').value='';
+    el('newItem').value=''; el('newAmount').value=''; el('newFxRate').value=''; el('newMemo').value=''; el('newPlaceAddr').value=''; el('newPlaceName').value=''; el('newTime').value=''; el('newCity').value='';
     el('smsPasteInput').value=''; el('smsPasteNote').textContent=''; el('smsPasteNote').classList.remove('warn');
     el('photoRecognizeNote').textContent=''; el('photoRecognizeNote').classList.remove('warn');
     pendingReceiptDataUrl = null;
@@ -2455,7 +2772,10 @@
         <button class="miniicon save-btn" data-save="${id}" title="저장">✔ 저장</button>
         <button class="miniicon cancel-btn" data-cancel="${id}" title="취소">✕ 취소</button>
       </div>
-      <input type="text" value="${escapeHtml(exp.memo||'')}" data-f="memo" placeholder="메모 (선택)">`;
+      <input type="text" value="${escapeHtml(exp.memo||'')}" data-f="memo" placeholder="메모 (선택)">
+      <input type="text" value="${escapeHtml(exp.placeName||'')}" data-f="placeName" placeholder="상호명 (선택)">
+      <input type="text" value="${escapeHtml(exp.placeAddr||'')}" data-f="placeAddr" placeholder="🗺 구글지도 주소/링크 (선택)">
+      <input type="text" value="${escapeHtml(exp.time||'')}" data-f="time" placeholder="⏱ 시각 HH:MM (선택)">`;
     row.querySelector('[data-f="paymentMethod"]').addEventListener('change', e => {
       row.querySelector('[data-f="cardType"]').style.display = (e.target.value === 'card') ? '' : 'none';
     });
@@ -2481,10 +2801,17 @@
       const item = row.querySelector('[data-f="item"]').value.trim();
       const amountKrw = Number(row.querySelector('[data-f="amountKrw"]').value);
       const memo = row.querySelector('[data-f="memo"]').value.trim();
+      const placeAddr = row.querySelector('[data-f="placeAddr"]').value.trim();
+      const placeName = row.querySelector('[data-f="placeName"]').value.trim();
+      const timeRaw = row.querySelector('[data-f="time"]').value.trim();
+      const time = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw.padStart(5,'0') : '';
       const paymentMethod = row.querySelector('[data-f="paymentMethod"]').value;
       const cardType = paymentMethod === 'card' ? row.querySelector('[data-f="cardType"]').value : null;
       if(!date || !item || !amountKrw || amountKrw<=0){ showToast('입력값을 확인해주세요'); return; }
       exp.date = date; exp.category = category; exp.country = country; exp.item = item; exp.amountKrw = amountKrw; exp.memo = memo;
+      exp.placeAddr = placeAddr;
+      exp.placeName = placeName;
+      exp.time = time;
       exp.paymentMethod = paymentMethod; exp.cardType = cardType;
       exp.receipt = editReceiptDataUrl;
       // 원화로 직접 수정한 경우 외화 원본표기는 참고용으로 남겨두되 금액 기준은 원화로 통일
@@ -2751,7 +3078,7 @@
       data.expenses.push({
         id: uid(), tripId: data.currentTripId, date: d.date, category: d.category, country: d.country, city: '',
         currency: d.currency, amountForeign: d.currency === 'KRW' ? null : (Number(d.foreignAmount)||0),
-        amountKrw, item: d.item, memo: d.memo || '', receipt: d.receipt
+        amountKrw, item: d.item, memo: d.memo || '', placeAddr: '', placeName: '', time: '', receipt: d.receipt
       });
       if(d.currency !== 'KRW' && d.fxRate){ data.lastFxRate[d.currency] = Number(d.fxRate); }
       addedCount++;
@@ -3026,10 +3353,10 @@
 
   // ---------- CSV 내보내기 ----------
   function doCsvExport(){
-    const rows = [['날짜','카테고리','국가','도시','항목','메모','통화','외화금액','원화금액','결제수단','카드구분']];
+    const rows = [['날짜','시각','카테고리','국가','도시','항목','메모','상호명','장소(구글지도)','통화','외화금액','원화금액','결제수단','카드구분']];
     tripExpenses(data.currentTripId).forEach(e => {
       const payLabel = e.paymentMethod === 'card' ? '카드' : e.paymentMethod === 'cash' ? '현금' : '';
-      rows.push([e.date, e.category, e.country, e.city||'', e.item, e.memo||'', e.currency, e.amountForeign||'', e.amountKrw, payLabel, e.cardType||'']);
+      rows.push([e.date, e.time||'', e.category, e.country, e.city||'', e.item, e.memo||'', e.placeName||'', e.placeAddr||'', e.currency, e.amountForeign||'', e.amountKrw, payLabel, e.cardType||'']);
     });
     const csv = rows.map(r => r.map(v => {
       const s = String(v);
