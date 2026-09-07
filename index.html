@@ -295,6 +295,11 @@
     background:var(--surface); border:1px solid var(--line2); border-radius:999px; padding:1px 6px;
   }
   .spot-chip.addr .spot-tagbadge{ color:var(--good); border-color:var(--good); }
+  .spot-reorder{ flex-shrink:0; display:flex; gap:1px; }
+  .spot-orderbtn{
+    background:none; border:none; font-size:10px; padding:2px 3px; opacity:.55; line-height:1; color:var(--ink2);
+  }
+  .spot-orderbtn:hover{ opacity:1; }
 
   .day-note-wrap{ margin-top:2px; }
   .day-note{
@@ -936,6 +941,7 @@
       timelineByTrip: {},
       placeNameCache: {},
       placeNameOverride: {},
+      expenseOrderOverride: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -957,6 +963,7 @@
     if(!d.timelineByTrip) d.timelineByTrip = {};
     if(!d.placeNameCache) d.placeNameCache = {};
     if(!d.placeNameOverride) d.placeNameOverride = {};
+    if(!d.expenseOrderOverride) d.expenseOrderOverride = {};
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1819,11 +1826,11 @@
     if(e.time) return 'time';
     return 'order';
   }
-  // 교통비(버스/지하철/택시 등)는 "머문 장소"가 아니라 이동 그 자체이므로(GPS의 activity 기록과 같은 성격)
-  // 방문지 목록·일기에서는 제외한다 — 지출내역(전체 내역)에는 그대로 남아 있어 정산에는 영향 없다.
-  const NON_VISIT_CATEGORIES = new Set(['교통']);
+  // 교통비(버스/지하철/택시 등)는 이동수단 이름으로 문장에 활용하기 위해 구분해둔다(제외하지는 않음 —
+  // 방문지 목록에는 그대로 남고, 일기 문장에서는 이동 구간의 실제 교통편 이름으로 우선 사용된다).
+  const TRANSIT_CATEGORIES = new Set(['교통']);
   function computeDayExpenseEntries(trip, dateStr){
-    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr && !NON_VISIT_CATEGORIES.has(e.category));
+    const dayExps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     const entries = [];
     const groupIndex = {};
     dayExps.forEach((e, idx) => {
@@ -1841,7 +1848,7 @@
         groupIndex[key] = entries.length;
       }
       entries.push({
-        source: 'expense', tier, label,
+        source: 'expense', tier, label, id: e.id,
         startTime: e.time || null, endTime: e.time || null, durationMin: null,
         category: e.category, amountKrw: e.amountKrw, item: e.item, count: 1,
         mapUrl: e.placeAddr ? mapUrlFor(e.placeAddr) : '', _seq: idx
@@ -1849,8 +1856,14 @@
     });
     return entries;
   }
-  // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다.
-  // 승인시각을 아는 지출은 정확한 위치에, 모르는 지출은 그날 지출 입력 순서 비율에 맞춰 사이사이에 나눠 끼운다.
+  function hhmmToMin(hhmm){
+    if(!hhmm) return null;
+    const [h,m] = hhmm.split(':').map(Number);
+    return h*60+m;
+  }
+  // GPS 방문 스팟(computeDaySpots)과 지출 기반 방문지를 하나의 시간순 목록으로 합친다. 승인시각을 아는 지출은
+  // 정확한 위치에 놓고, 모르는(순서 추정) 지출은 그날 전체 시간대(첫~마지막 방문 사이) 안에서 지출 입력 순서
+  // 비율에 맞춰 실제 "분" 단위 시각으로 추정해 배치한다 — ✏️ 순서 조정으로 사용자가 직접 보정한 값이 있으면 그걸 그대로 쓴다.
   function computeDayTimeline(trip, dateStr){
     const gpsSpots = computeDaySpots(trip, dateStr).map(v => ({
       source:'gps', tier:'gps', label:v.label, startTime:v.startTime, endTime:v.endTime,
@@ -1860,18 +1873,36 @@
     const expEntries = computeDayExpenseEntries(trip, dateStr);
     const timed = expEntries.filter(e => e.startTime);
     const untimed = expEntries.filter(e => !e.startTime);
-    const combined = [...gpsSpots, ...timed].sort((a,b) => (a.startTime||'').localeCompare(b.startTime||''));
+    const anchors = [...gpsSpots, ...timed]
+      .map(e => ({ ...e, _min: hhmmToMin(e.startTime) }))
+      .sort((a,b) => a._min - b._min);
+    // 순서추정 항목은 "그날 전체 시간대"에 통째로 비율 배치하면 중간에 낀 다른 실제 방문지(GPS 앵커)를
+    // 건너뛰어버릴 수 있다(예: 공항 도착 이전 지출과 공항 도착 이후 지출이 뒤섞여 순서가 꼬임) — 그래서 이미
+    // 배치된 항목들 사이의 "바로 이웃한 두 시각" 사이로만 보간해, 앵커가 늘어날수록 점점 더 정확한 구간에 놓이도록 한다.
+    const seq = anchors.slice();
     untimed.forEach((u, i) => {
-      const ratio = (i+1) / (untimed.length+1);
-      const insertAt = Math.min(combined.length, Math.round(ratio * combined.length));
-      combined.splice(insertAt, 0, u);
+      const override = data.expenseOrderOverride && data.expenseOrderOverride[u.id];
+      if(override != null){
+        u._min = override;
+      }else{
+        const ratio = (i+1) / (untimed.length+1);
+        const insertAt = Math.min(seq.length, Math.round(ratio * seq.length));
+        const prev = seq[insertAt-1], next = seq[insertAt];
+        const prevMin = prev ? prev._min : (next ? next._min - 60 : 0);
+        const nextMin = next ? next._min : (prevMin + 60);
+        u._min = (prevMin + nextMin) / 2;
+      }
+      let idx = seq.findIndex(x => x._min > u._min);
+      if(idx === -1) idx = seq.length;
+      seq.splice(idx, 0, u);
     });
-    return combined;
+    return seq;
   }
-  const GAP_FLAG_MIN = 90;
-  // GPS 기록상 "도보/버스 등 이동" 활동만 90분 이상 이어지는데 그 사이 방문지로 확인된 곳이 없는 구간을
-  // "정확한 위치를 알 수 없는 공백"으로 표시한다 — 있지도 않은 장소를 지어내지 않기 위한 정직한 안내다.
-  function computeDayGaps(trip, dateStr, gpsSpots){
+  const MOVEMENT_MENTION_MIN = 15; // 이보다 짧은 이동은 문장에서 생략하고 다음 장소 문장에 자연스럽게 흡수한다
+  // GPS 기록상 "도보/버스/비행기 등 이동" 활동만 이어지는 구간(그 사이 확인된 방문지가 없는 구간)을
+  // "실제 이동"으로 뽑아낸다. 있지도 않은 장소를 지어내는 대신, 구글 타임라인이 감지한 이동수단(비행기/도보/
+  // 지하철 등)과 소요시간을 그대로 문장에 살린다.
+  function computeDayMovements(trip, dateStr, gpsSpots){
     const bucket = data.timelineByTrip && data.timelineByTrip[trip.id];
     if(!bucket) return [];
     const dayVisits = bucket.visits.filter(v => v.date === dateStr && v.startTime && v.endTime)
@@ -1879,46 +1910,29 @@
     if(!dayVisits.length) return [];
     const covered = gpsSpots.map(s => [s.startTime, s.endTime]);
     const isCovered = t => covered.some(([s,e]) => t >= s && t < e);
-    const gaps = [];
-    let curStart = null, curEnd = null;
+    const movements = [];
+    let segs = [];
     const flush = () => {
-      if(curStart != null){
-        const dur = minutesBetween(curStart, curEnd);
-        if(dur >= GAP_FLAG_MIN) gaps.push({ startTime:curStart, endTime:curEnd, durationMin:dur });
+      if(segs.length){
+        const start = segs[0].startTime, end = segs[segs.length-1].endTime;
+        const dur = minutesBetween(start, end);
+        if(dur >= MOVEMENT_MENTION_MIN){
+          // 여러 이동수단이 섞여 있으면(예: 도보→비행기→도보) 그중 가장 오래 걸린 구간의 이동수단을 대표로 쓴다.
+          const longest = segs.slice().sort((a,b)=> minutesBetween(a.startTime,a.endTime) - minutesBetween(b.startTime,b.endTime)).pop();
+          movements.push({ startTime:start, endTime:end, durationMin:dur, gpsModeLabel:(longest.label||'').replace(/\s*이동$/,'') });
+        }
       }
-      curStart = null; curEnd = null;
+      segs = [];
     };
     dayVisits.forEach(v => {
-      if(v.kind === 'activity' && !isCovered(v.startTime)){
-        if(curStart == null) curStart = v.startTime;
-        curEnd = v.endTime;
-      }else{
-        flush();
-      }
+      if(v.kind === 'activity' && !isCovered(v.startTime)){ segs.push(v); }
+      else flush();
     });
     flush();
-    return gaps;
-  }
-  // 공백 구간(gap)이 통합 타임라인(entries) 안에서 어디에 걸리는지 찾아, 정확한 시각을 아는 항목(GPS 방문지·
-  // 카드승인시각이 찍힌 지출) 사이의 "경계 인덱스"를 계산한다. 그 경계 사이에 낀 항목(시각을 모르는 지출 포함)은
-  // 이 공백 구간 안에서 일어난 일로 보고 일기에 자연스럽게 이어 붙인다 — "장소는 알지만 정확한 동선은 모른다"를
-  // "아예 아무 기록도 없다"처럼 모순되게 말하지 않기 위함이다.
-  function annotateGapsWithEntries(gaps, entries){
-    const anchors = entries
-      .map((e,i) => ({ i, t: e.source === 'gps' ? e.startTime : (e.tier === 'time' ? e.startTime : null) }))
-      .filter(a => a.t);
-    return gaps.map(g => {
-      let beforeIdx = -1, afterIdx = entries.length;
-      anchors.forEach(a => {
-        if(a.t <= g.startTime) beforeIdx = Math.max(beforeIdx, a.i);
-        if(a.t >= g.endTime) afterIdx = Math.min(afterIdx, a.i);
-      });
-      const within = entries.slice(beforeIdx + 1, afterIdx).filter(e => e.source !== 'gps');
-      return { ...g, insertBeforeIdx: afterIdx, explainedBy: within.map(e => e.label) };
-    });
+    return movements;
   }
 
-  // ---------- 방문 스팟(GPS+지출) 랭킹 리스트 — 신뢰도 등급을 배지로 함께 표시 ----------
+  // ---------- 방문 스팟(GPS+지출) 랭킹 리스트 — 신뢰도 등급을 배지로, 순서추정 항목은 ▲▼로 직접 보정 가능 ----------
   function daySpotListHtml(entries){
     if(!entries.length) return '';
     const tierLabel = { gps:'GPS', addr:'지출·주소', time:'지출·시각', order:'지출·추정' };
@@ -1932,6 +1946,15 @@
       const timeRange = v.startTime ? (v.endTime && v.endTime !== v.startTime ? `${v.startTime}~${v.endTime}` : v.startTime) : '';
       const durLabel = [dur, timeRange].filter(Boolean).join(' · ');
       const editBtn = isGps ? `<button type="button" class="spot-editbtn" data-rename-spot data-lat="${v.lat}" data-lng="${v.lng}" data-name="${escapeHtml(v.label || '')}" title="장소 이름 수정">✏️</button>` : '';
+      // 순서추정(order) 항목만 ▲▼로 방문 순서를 직접 보정할 수 있다 — 시각을 몰라 자동 배치가 틀릴 수 있어서다.
+      let reorderHtml = '';
+      if(v.tier === 'order'){
+        const upTarget = i > 0 ? (entries[i-1]._min - 1) : null;
+        const downTarget = i < entries.length-1 ? (entries[i+1]._min + 1) : null;
+        const upBtn = upTarget != null ? `<button type="button" class="spot-orderbtn" data-order-move data-expense-id="${v.id}" data-target-min="${upTarget}" title="한 칸 앞으로">▲</button>` : '';
+        const downBtn = downTarget != null ? `<button type="button" class="spot-orderbtn" data-order-move data-expense-id="${v.id}" data-target-min="${downTarget}" title="한 칸 뒤로">▼</button>` : '';
+        reorderHtml = `<span class="spot-reorder">${upBtn}${downBtn}</span>`;
+      }
       const nameHtml = v.mapUrl
         ? `<a class="spot-name${isNamed?'':' spot-unnamed'}" href="${escapeHtml(v.mapUrl)}" target="_blank" rel="noopener">${escapeHtml(displayName)}</a>`
         : `<span class="spot-name${isNamed?'':' spot-unnamed'}">${escapeHtml(displayName)}</span>`;
@@ -1940,15 +1963,16 @@
         ${nameHtml}
         <span class="spot-tagbadge">${tierLabel[v.tier]||''}</span>
         ${editBtn}
+        ${reorderHtml}
         <span class="spot-dur tabular">${escapeHtml(durLabel)}</span>
       </div>`;
     }).join('');
     return `<div class="itin-add-label" style="margin-top:2px;">📍 오늘 방문한 곳 (방문 순서)</div>
       <div class="spot-list">${rows}</div>
-      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · GPS 방문지는 탭하면 구글 지도로 이동(✏️로 이름 수정 가능) · 지출 항목은 상호명/구글지도 주소·카드승인시각이 있을수록 정확도가 올라가요</div>`;
+      <div class="spot-attrib">위치정보 제공: OpenStreetMap 기여자 · GPS 방문지는 탭하면 구글 지도로 이동(✏️로 이름 수정 가능) · 지출 항목은 상호명/구글지도 주소·카드승인시각이 있을수록 정확도가 올라가요 · 순서를 모르는(지출·추정) 항목은 ▲▼로 순서를 직접 바로잡을 수 있어요</div>`;
   }
 
-  // ---------- 하루 일기 문단 자동 생성(3인칭 존댓말, 방문지+지출을 시간순으로 자연스럽게 엮음) ----------
+  // ---------- 하루 일기 문단 자동 생성(3인칭 존댓말) — 방문지 + 실제 이동수단·소요시간을 시간순으로 엮는다 ----------
   const CATEGORY_VISIT_VERB = {
     '식사': '식사하셨어요', '음료': '음료를 즐기셨어요', '투어': '투어에 참여하셨어요',
     '숙소': '머무르셨어요', '교통': '이동하셨어요', '기타': '들르셨어요'
@@ -1963,26 +1987,63 @@
     if(h < 21) return '저녁 무렵';
     return '밤';
   }
-  // 공백 구간(gap)을 그 시간대에 실제로 해당하는 항목 "바로 뒤"에 끼워 넣어, 이미 알고 있는 사실(예: 투어를
-  // 다녀온 것)과 "정확한 동선까지는 모른다"는 안내가 한 문단 안에서 자연스럽게 이어지도록 한다. 그 구간 안에
-  // 낀 항목이 있으면(explainedBy) "기록이 전혀 없다"고 단정하지 않고 그 항목을 근거로 완곡하게 표현한다.
-  function dayDiaryText(trip, dateStr, entries, gaps){
+  // 한국어 "로/으로" 조사: 받침 없음 또는 ㄹ받침이면 "로", 그 외 받침 있으면 "으로". 한글이 아닌 단어(영문 상호명 등)는 "로"를 쓴다.
+  function josaRo(word){
+    const ch = (word||'').trim().slice(-1);
+    const code = ch.charCodeAt(0);
+    if(code >= 0xAC00 && code <= 0xD7A3){
+      const batchim = (code - 0xAC00) % 28;
+      return (batchim === 0 || batchim === 8) ? '로' : '으로';
+    }
+    return '로';
+  }
+  // 이동 구간(movements)을 GPS 방문지·지출이 뒤섞인 통합 타임라인(entries) 안의 정확한 위치에 끼워 넣는다.
+  // 그 구간 안에 교통비 지출(순서추정이라도)이 끼어 있으면 그 지출의 실제 이름(예: "영국지하철")을 이동수단으로
+  // 우선 쓰고, 없으면 구글 타임라인이 감지한 이동수단(비행기/도보 등)을 쓴다 — 어느 쪽도 없으면 "이동"이라고만 한다.
+  // 이렇게 이동수단으로 이미 쓰인 지출은 뒤에서 "OO에서 이동하셨어요"로 또 서술하지 않는다(중복 방지).
+  function dayDiaryText(trip, dateStr, entries, movements){
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     if(!entries.length && !exps.length) return '';
     const connectors = ['이어서', '그다음엔', '그 뒤', '이후'];
     const sentences = [];
-    const gapsByIdx = {};
-    gaps.forEach(g => { (gapsByIdx[g.insertBeforeIdx] = gapsByIdx[g.insertBeforeIdx] || []).push(g); });
-    const emitGap = g => {
-      // explainedBy(그 구간 안에 낀 지출 항목)가 있으면 이미 바로 앞 문장들에서 그 항목을 그대로 언급했으므로
-      // 여기서 이름을 반복하지 않는다 — "OO 들르셨어요. 근데 사실 OO 말고는 모른다"처럼 같은 말을 두 번 하는
-      // 대신, 정말 아무 근거도 없을 때만 "동선 기록이 없다"고 안내한다.
-      if(g.explainedBy && g.explainedBy.length) return;
-      const timeRange = `${g.startTime}~${g.endTime}`;
-      sentences.push(`${timeRange} 사이는 정확한 동선 기록이 남아있지 않아요`);
+    const anchorIdx = entries.map((e,i) => (e.source === 'gps' || e.tier === 'time') ? i : -1).filter(i => i >= 0);
+    const consumed = new Set();
+    const movementBeats = movements.map(mv => {
+      let beforeIdx = -1, afterIdx = entries.length;
+      anchorIdx.forEach(i => {
+        const t = entries[i].startTime;
+        if(t <= mv.startTime) beforeIdx = Math.max(beforeIdx, i);
+        if(t >= mv.endTime) afterIdx = Math.min(afterIdx, i);
+      });
+      let modeLabel = mv.gpsModeLabel || '이동';
+      let hasRealTransit = false;
+      for(let k = beforeIdx+1; k < afterIdx; k++){
+        const cand = entries[k];
+        if(cand.source === 'expense' && TRANSIT_CATEGORIES.has(cand.category) && !consumed.has(k)){
+          modeLabel = cand.label; consumed.add(k); hasRealTransit = true; break;
+        }
+      }
+      return { insertBeforeIdx: afterIdx, modeLabel, startTime: mv.startTime, durationMin: mv.durationMin, hasRealTransit, gpsModeLabel: mv.gpsModeLabel };
+    });
+    // 장거리 이동수단(비행기·기차·페리)은 GPS가 감지한 소요시간을 그대로 믿을 만하다. 하지만 도보·차량처럼
+    // 도심 안에서 짧게 반복되는 이동은 구글 타임라인이 여러 정차·구경 시간을 하나의 "이동"으로 뭉뚱그리는
+    // 경우가 많아, 실제 결제한 교통편 이름이 없는데 1시간 넘게 잡히면 오히려 부정확하게 단정하는 셈이 된다.
+    // 그런 경우엔 근거 없는 소요시간을 굳이 문장으로 만들지 않고 조용히 생략한다(정직한 안내).
+    const LONG_HAUL_MODES = new Set(['비행기', '기차', '페리']);
+    const movementsByIdx = {};
+    movementBeats.forEach(m => {
+      const trustworthy = m.hasRealTransit || LONG_HAUL_MODES.has(m.gpsModeLabel) || m.durationMin < 60;
+      if(!trustworthy) return;
+      (movementsByIdx[m.insertBeforeIdx] = movementsByIdx[m.insertBeforeIdx] || []).push(m);
+    });
+    const emitMovement = m => {
+      const lead = sentences.length === 0 ? timeOfDayWord(m.startTime) : connectors[(sentences.length-1) % connectors.length];
+      const durNote = m.durationMin >= 60 ? ` ${formatDuration(m.durationMin)} 정도` : '';
+      sentences.push(`${lead} ${m.modeLabel}${josaRo(m.modeLabel)}${durNote} 이동하셨어요`.replace(/\s+/g,' ').trim());
     };
     entries.forEach((v, i) => {
-      (gapsByIdx[i] || []).forEach(emitGap);
+      (movementsByIdx[i] || []).forEach(emitMovement);
+      if(consumed.has(i)) return; // 이동수단 이름으로 이미 언급된 지출은 별도 문장으로 다시 서술하지 않는다
       const lead = sentences.length === 0
         ? `${timeOfDayWord(v.startTime)}${v.startTime ? ' '+v.startTime : ''}`.trim()
         : connectors[(sentences.length-1) % connectors.length];
@@ -1995,10 +2056,11 @@
         sentences.push(`${lead} ${v.label}에서${countNote} ${verb}`);
       }
     });
-    (gapsByIdx[entries.length] || []).forEach(emitGap);
+    (movementsByIdx[entries.length] || []).forEach(emitMovement);
     if(exps.length){
       const total = exps.reduce((s,e)=>s+e.amountKrw,0);
-      sentences.push(`오늘 하루 ${entries.length}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
+      const placeCount = entries.length - consumed.size;
+      sentences.push(`오늘 하루 ${placeCount}곳을 들르며 지출은 총 ${exps.length}건, ${won(total)}이었어요`);
     }
     if(!sentences.length) return '';
     return sentences.join('. ') + '.';
@@ -2009,8 +2071,8 @@
     const exps = tripExpenses(trip.id).filter(e => e.date === dateStr);
     const gpsSpots = computeDaySpots(trip, dateStr);
     const entries = computeDayTimeline(trip, dateStr);
-    const gaps = annotateGapsWithEntries(computeDayGaps(trip, dateStr, gpsSpots), entries);
-    const diary = dayDiaryText(trip, dateStr, entries, gaps);
+    const movements = computeDayMovements(trip, dateStr, gpsSpots);
+    const diary = dayDiaryText(trip, dateStr, entries, movements);
     const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
     const note = day ? (day.note || '') : '';
 
@@ -2930,6 +2992,20 @@
     const input = prompt('이 장소의 실제 이름을 입력해주세요 (비워두고 확인하면 자동인식 결과로 되돌아갑니다)', current);
     if(input === null) return;
     setPlaceNameOverride(lat, lng, input.trim());
+    renderItineraryTab();
+  });
+
+  // ---------- 일자별 요약: 순서추정 지출 항목의 방문 순서 직접 보정(▲▼) ----------
+  el('itineraryDays').addEventListener('click', e => {
+    const btn = e.target.closest('[data-order-move]');
+    if(!btn) return;
+    e.preventDefault();
+    const expId = btn.dataset.expenseId;
+    const targetMin = parseFloat(btn.dataset.targetMin);
+    if(!expId || Number.isNaN(targetMin)) return;
+    if(!data.expenseOrderOverride) data.expenseOrderOverride = {};
+    data.expenseOrderOverride[expId] = targetMin;
+    saveData(data);
     renderItineraryTab();
   });
 
