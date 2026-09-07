@@ -113,14 +113,6 @@
   .budget-progress-group:last-child{ margin-bottom:0; }
   .budget-progress-label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink2); margin-bottom:8px; }
 
-  .trend-svg{ width:100%; height:120px; display:block; }
-  .trend-area{ fill:var(--accent); fill-opacity:.15; stroke:none; }
-  .trend-line{ fill:none; stroke:var(--accent); stroke-width:2; vector-effect:non-scaling-stroke; }
-  .trend-dot{ fill:var(--accent); }
-  .trend-budgetline{ stroke:var(--ink3); stroke-width:1; stroke-dasharray:4,3; vector-effect:non-scaling-stroke; }
-  .trend-labels{ display:flex; justify-content:space-between; margin-top:6px; font-size:11px; color:var(--ink2); }
-  .trend-labels .trend-total{ font-weight:700; color:var(--ink); }
-  .trend-legend{ font-size:10.5px; color:var(--ink3); margin-top:4px; }
   .panel-empty{ font-size:12px; color:var(--ink3); padding:14px 0; text-align:center; }
 
   .sectionhead{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
@@ -256,6 +248,12 @@
   .erow.editmode input, .erow.editmode select{
     width:100%; border:1px solid var(--line2); border-radius:7px; padding:6px 8px; font-size:12.5px; background:var(--bg); color:var(--ink);
   }
+  .erow.editmode .edit-amount-row{ display:flex; gap:6px; }
+  .erow.editmode .edit-amount-row select{ width:auto; flex:0 0 78px; }
+  .erow.editmode .edit-amount-row input{ width:auto; flex:1; min-width:0; }
+  .erow.editmode .edit-fx-row{ display:flex; align-items:center; gap:8px; }
+  .erow.editmode .edit-fx-row input{ width:auto; flex:1; min-width:0; }
+  .erow.editmode .edit-fx-row [data-fx-preview]{ flex-shrink:0; font-size:11.5px; color:var(--ink2); white-space:nowrap; }
   .erow.editmode .rowbtns{ justify-content:flex-start; margin-top:6px; gap:12px; }
   .erow.editmode .rowbtns .miniicon{
     font-size:13px; font-weight:700; padding:8px 16px; border-radius:8px; display:inline-flex; align-items:center; gap:5px;
@@ -540,11 +538,6 @@
         <div class="panel-title">국가별 지출 비교</div>
         <div id="countryPanel"></div>
       </div>
-    </div>
-
-    <div class="panel" style="margin-bottom:24px;">
-      <div class="panel-title">누적 지출 추이</div>
-      <div id="trendPanel"></div>
     </div>
 
     <div class="panel" id="budgetProgressPanel" style="margin-bottom:24px; display:none;">
@@ -1403,53 +1396,6 @@
     }).join('');
   }
 
-  // ---------- 렌더: 누적 지출 추이 ----------
-  function renderTrendPanel(){
-    const trip = currentTrip();
-    const list = tripExpenses(trip.id);
-    const panel = el('trendPanel');
-    if(!list.length){ panel.innerHTML = '<div class="panel-empty">아직 지출 내역이 없습니다</div>'; return; }
-
-    const byDate = {};
-    list.forEach(e => { byDate[e.date] = (byDate[e.date]||0) + e.amountKrw; });
-    const dates = Object.keys(byDate).sort();
-    let running = 0;
-    const points = dates.map(d => { running += byDate[d]; return { date: d, cum: running }; });
-
-    if(points.length < 2){
-      panel.innerHTML = `<div class="panel-empty">${points[0].date.slice(5).replace('-','.')} 하루치 지출만 있어요 (누적 ${won(points[0].cum)}) — 여러 날 지출이 쌓이면 추이 그래프가 표시됩니다</div>`;
-      return;
-    }
-
-    const budget = Number(trip.budget) || 0;
-    const maxY = Math.max(running, budget) || 1;
-    const W = 100, H = 100;
-    const stepX = W / (points.length - 1);
-    const coords = points.map((p,i) => ({ x: i*stepX, y: H - (p.cum/maxY)*H }));
-    const linePath = coords.map((c,i) => (i===0?'M':'L') + c.x.toFixed(2) + ',' + c.y.toFixed(2)).join(' ');
-    const areaPath = linePath + ` L${coords[coords.length-1].x.toFixed(2)},${H} L0,${H} Z`;
-
-    let budgetLine = '';
-    if(budget > 0){
-      const by = H - (budget/maxY)*H;
-      budgetLine = `<line x1="0" y1="${by.toFixed(2)}" x2="${W}" y2="${by.toFixed(2)}" class="trend-budgetline" />`;
-    }
-
-    panel.innerHTML = `
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="trend-svg">
-        <path d="${areaPath}" class="trend-area"></path>
-        ${budgetLine}
-        <path d="${linePath}" class="trend-line"></path>
-      </svg>
-      <div class="trend-labels">
-        <span>${points[0].date.slice(5).replace('-','.')}</span>
-        <span class="trend-total tabular">누적 ${won(running)}</span>
-        <span>${points[points.length-1].date.slice(5).replace('-','.')}</span>
-      </div>
-      ${budget > 0 ? `<div class="trend-legend">점선 = 여행 예산(${won(budget)})</div>` : ''}
-    `;
-  }
-
   // ---------- 렌더: 카테고리·나라별 예산 진행률 ----------
   // 설정에서 예산을 설정해둔 카테고리/국가만 보여준다(설정 안 하면 진행률 패널 자체가 숨겨짐).
   function renderBudgetProgress(){
@@ -1773,7 +1719,6 @@
 
     renderCategoryPanel();
     renderCountryPanel();
-    renderTrendPanel();
     renderBudgetProgress();
     renderDayGroups();
   }
@@ -2368,11 +2313,24 @@
     const countryOptions = data.countries.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.country?'selected':''}>${escapeHtml(c)}</option>`).join('');
     const payMethod = exp.paymentMethod || 'cash';
     const cardTypeOptions = data.cardTypes.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.cardType?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    const expCurrency = exp.currency || 'KRW';
+    const currencyOptions = data.currencies.map(c=>`<option value="${escapeHtml(c)}" ${c===expCurrency?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    // 수정모드는 내가 실제로 입력했던 화폐 그대로 보여주고 고친다(항상 원화로 강제 변환해 보여주지 않음) — 리스트 화면은 지금처럼 원화 표시 유지.
+    const amountValue = expCurrency === 'KRW' ? exp.amountKrw : (exp.amountForeign != null ? exp.amountForeign : '');
+    const fxRateValue = expCurrency === 'KRW' ? ''
+      : (exp.amountForeign ? +(exp.amountKrw / exp.amountForeign).toFixed(2) : (data.lastFxRate[expCurrency] || ''));
     let editReceiptDataUrl = exp.receipt || null;
     row.classList.add('editmode');
     row.innerHTML = `
       <input type="text" value="${escapeHtml(exp.item)}" data-f="item" placeholder="지출 항목">
-      <input type="number" value="${exp.amountKrw}" data-f="amountKrw" min="0" step="100" placeholder="원화 금액">
+      <div class="edit-amount-row">
+        <select data-f="currency">${currencyOptions}</select>
+        <input type="number" value="${amountValue}" data-f="amount" min="0" step="1" placeholder="금액">
+      </div>
+      <div class="edit-fx-row" data-fx-row style="${expCurrency==='KRW' ? 'display:none;' : ''}">
+        <input type="number" value="${fxRateValue}" data-f="fxRate" min="0" step="0.01" placeholder="환율 (1단위 = ?원)">
+        <span class="tabular" data-fx-preview></span>
+      </div>
       <input type="date" value="${exp.date}" data-f="date">
       <select data-f="category">${catOptions}</select>
       <select data-f="country">${countryOptions}</select>
@@ -2394,6 +2352,26 @@
     row.querySelector('[data-f="paymentMethod"]').addEventListener('change', e => {
       row.querySelector('[data-f="cardType"]').style.display = (e.target.value === 'card') ? '' : 'none';
     });
+    function updateEditFxPreview(){
+      const cur = row.querySelector('[data-f="currency"]').value;
+      const amt = Number(row.querySelector('[data-f="amount"]').value) || 0;
+      const rateInput = row.querySelector('[data-f="fxRate"]');
+      const rate = rateInput ? (Number(rateInput.value) || 0) : 0;
+      const preview = row.querySelector('[data-fx-preview]');
+      if(!preview) return;
+      preview.textContent = (cur !== 'KRW' && amt && rate) ? '≈ ' + won(amt * rate) : '';
+    }
+    row.querySelector('[data-f="currency"]').addEventListener('change', e => {
+      const cur = e.target.value;
+      const isForeign = cur !== 'KRW';
+      row.querySelector('[data-fx-row]').style.display = isForeign ? '' : 'none';
+      const rateInput = row.querySelector('[data-f="fxRate"]');
+      if(isForeign && rateInput && !rateInput.value && data.lastFxRate[cur]) rateInput.value = data.lastFxRate[cur];
+      updateEditFxPreview();
+    });
+    row.querySelector('[data-f="amount"]').addEventListener('input', updateEditFxPreview);
+    row.querySelector('[data-f="fxRate"]').addEventListener('input', updateEditFxPreview);
+    updateEditFxPreview();
     const photoRow = row.querySelector('[data-photo-row]');
     const receiptFileInput = row.querySelector('[data-f="receiptFile"]');
     function refreshPhotoRow(){ photoRow.innerHTML = editPhotoRowHtml(editReceiptDataUrl); }
@@ -2421,14 +2399,20 @@
           if(parsed.item){ row.querySelector('[data-f="item"]').value = parsed.item; changed.push('항목명'); }
           if(parsed.date){ row.querySelector('[data-f="date"]').value = parsed.date; changed.push('날짜'); }
           if(parsed.category && data.categories.includes(parsed.category)){ row.querySelector('[data-f="category"]').value = parsed.category; changed.push('카테고리'); }
-          let krwAmount = null;
-          if(parsed.currency && parsed.currency !== 'KRW' && parsed.foreignAmount){
-            if(parsed.krwAmount) krwAmount = parsed.krwAmount;
-            else if(data.lastFxRate[parsed.currency]) krwAmount = computeKrw(parsed.currency, parsed.foreignAmount, data.lastFxRate[parsed.currency]);
+          if(parsed.currency && parsed.currency !== 'KRW' && data.currencies.includes(parsed.currency) && parsed.foreignAmount){
+            row.querySelector('[data-f="currency"]').value = parsed.currency;
+            row.querySelector('[data-f="amount"]').value = parsed.foreignAmount;
+            row.querySelector('[data-fx-row]').style.display = '';
+            const rate = parsed.krwAmount ? +(parsed.krwAmount/parsed.foreignAmount).toFixed(2) : (data.lastFxRate[parsed.currency] || '');
+            if(rate) row.querySelector('[data-f="fxRate"]').value = rate;
+            changed.push('금액');
           } else if(parsed.krwAmount){
-            krwAmount = parsed.krwAmount;
+            row.querySelector('[data-f="currency"]').value = 'KRW';
+            row.querySelector('[data-f="amount"]').value = Math.round(parsed.krwAmount);
+            row.querySelector('[data-fx-row]').style.display = 'none';
+            changed.push('금액');
           }
-          if(krwAmount){ row.querySelector('[data-f="amountKrw"]').value = Math.round(krwAmount); changed.push('금액'); }
+          updateEditFxPreview();
           showToast(changed.length ? `재인식으로 ${changed.join('·')} 갱신됨 (저장을 눌러야 반영됩니다)` : '영수증에서 새로운 정보를 찾지 못했습니다');
         }catch(err){
           showToast('재인식 중 오류가 발생했습니다');
@@ -2451,7 +2435,9 @@
       const category = row.querySelector('[data-f="category"]').value;
       const country = row.querySelector('[data-f="country"]').value;
       const item = row.querySelector('[data-f="item"]').value.trim();
-      const amountKrw = Number(row.querySelector('[data-f="amountKrw"]').value);
+      const currency = row.querySelector('[data-f="currency"]').value;
+      const amount = Number(row.querySelector('[data-f="amount"]').value);
+      const fxRate = Number(row.querySelector('[data-f="fxRate"]').value);
       const memo = row.querySelector('[data-f="memo"]').value.trim();
       const placeAddr = row.querySelector('[data-f="placeAddr"]').value.trim();
       const placeName = row.querySelector('[data-f="placeName"]').value.trim();
@@ -2459,14 +2445,20 @@
       const time = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw.padStart(5,'0') : '';
       const paymentMethod = row.querySelector('[data-f="paymentMethod"]').value;
       const cardType = paymentMethod === 'card' ? row.querySelector('[data-f="cardType"]').value : null;
-      if(!date || !item || !amountKrw || amountKrw<=0){ showToast('입력값을 확인해주세요'); return; }
-      exp.date = date; exp.category = category; exp.country = country; exp.item = item; exp.amountKrw = amountKrw; exp.memo = memo;
+      if(!date || !item || !amount || amount<=0){ showToast('입력값을 확인해주세요'); return; }
+      if(currency !== 'KRW' && (!fxRate || fxRate<=0)){ showToast('환율을 입력해주세요'); return; }
+      const amountKrw = computeKrw(currency, amount, fxRate);
+      exp.date = date; exp.category = category; exp.country = country; exp.item = item;
+      exp.currency = currency;
+      exp.amountForeign = currency === 'KRW' ? null : amount;
+      exp.amountKrw = amountKrw;
+      exp.memo = memo;
       exp.placeAddr = placeAddr;
       exp.placeName = placeName;
       exp.time = time;
       exp.paymentMethod = paymentMethod; exp.cardType = cardType;
       exp.receipt = editReceiptDataUrl;
-      // 원화로 직접 수정한 경우 외화 원본표기는 참고용으로 남겨두되 금액 기준은 원화로 통일
+      if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
       saveData(data);
       render();
       showToast('수정되었습니다');
