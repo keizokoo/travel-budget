@@ -74,17 +74,11 @@
   }
   #installBtn{ display:none; }
 
-  .hero-stats{ display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:10px; }
-  .hstat{ background:var(--bg); border:1px solid var(--line2); border-radius:12px; padding:11px 13px; }
-  .hstat .l{ font-size:10px; color:var(--ink2); text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-bottom:6px; }
-  .hstat .v{ font-size:16px; font-weight:700; }
-  .hstat .v.accent{ color:var(--accent); }
-  .hstat.editable .v{ cursor:text; border-bottom:1px dashed var(--ink3); display:inline-block; }
-  .hstat input.editv{
-    font-size:16px; font-weight:700; color:var(--ink); background:transparent; border:none;
-    border-bottom:1.5px solid var(--accent); width:100%; padding:0;
-  }
-  .hstat input.editv:focus{ outline:none; }
+  .heronum{ background:var(--bg); border:1px solid var(--line2); border-radius:14px; padding:16px 14px 14px; text-align:center; }
+  .heronum .l{ font-size:10.5px; color:var(--ink2); text-transform:uppercase; letter-spacing:.06em; font-weight:700; margin-bottom:6px; }
+  .heronum .v{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:26px; font-weight:700; color:var(--accent); }
+  .heronum .sub{ margin-top:8px; font-size:12px; color:var(--ink2); }
+  .heronum .sub b{ color:var(--ink); }
 
   /* ---------- body ---------- */
   .body{ padding:22px 28px 0; }
@@ -375,11 +369,6 @@
   .fxrate-row input{ flex:1; border:1px solid var(--line2); border-radius:8px; padding:7px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); }
   .fxrate-row button{ flex-shrink:0; background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; }
   .fxrate-row button.saved{ background:var(--good); }
-  .budget-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .budget-row .budget-label{ flex:1; min-width:0; font-weight:700; font-size:12.5px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .budget-row input{ width:120px; flex-shrink:0; border:1px solid var(--line2); border-radius:8px; padding:7px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); }
-  .budget-row button{ flex-shrink:0; background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; }
-  .budget-row button.saved{ background:var(--good); }
   .fxrate-empty{ margin:0; }
   .drawer .fieldrow{ margin-bottom:10px; }
   .drawer label{ display:block; font-size:12px; color:var(--ink2); margin-bottom:5px; }
@@ -453,7 +442,7 @@
   }
   .highlight-row:last-child{ border-bottom:none; }
   .highlight-row:hover{ background:var(--surface); }
-  .highlight-thumb{ width:44px; height:44px; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid var(--line2); }
+  .highlight-row .highlight-thumb{ width:44px; height:44px; margin-bottom:0; border-radius:8px; object-fit:cover; flex-shrink:0; border:1px solid var(--line2); }
   .highlight-thumb-empty{ display:flex; align-items:center; justify-content:center; background:var(--bg); font-size:16px; color:var(--ink3); }
   .highlight-info{ flex:1; min-width:0; }
   .highlight-date{ font-weight:700; font-size:12.5px; }
@@ -512,14 +501,10 @@
         <button class="iconbtn" id="settingsToggle">⚙ 설정</button>
       </div>
     </div>
-    <div class="hero-stats">
-      <div class="hstat editable" id="budgetCard">
-        <div class="l">여행 예산 (클릭해서 수정)</div>
-        <div class="v tabular" id="budgetView">0원</div>
-      </div>
-      <div class="hstat"><div class="l">총 지출</div><div class="v tabular" id="spentView">0원</div></div>
-      <div class="hstat"><div class="l">잔여</div><div class="v tabular accent" id="remainView">0원</div></div>
-      <div class="hstat"><div class="l">건수 · 일차</div><div class="v tabular" id="countView">0건</div></div>
+    <div class="heronum">
+      <div class="l">총 지출</div>
+      <div class="v tabular" id="spentView">0원</div>
+      <div class="sub" id="heroSubLine"></div>
     </div>
   </div>
 </div>
@@ -538,11 +523,6 @@
         <div class="panel-title">국가별 지출 비교</div>
         <div id="countryPanel"></div>
       </div>
-    </div>
-
-    <div class="panel" id="budgetProgressPanel" style="margin-bottom:24px; display:none;">
-      <div class="panel-title">예산 진행률</div>
-      <div id="budgetProgressBody"></div>
     </div>
 
     <div class="sectionhead">
@@ -701,23 +681,7 @@
           <input type="date" id="tripEndInput">
         </div>
       </div>
-      <div class="fieldrow">
-        <label>여행 예산 (원)</label>
-        <input type="number" id="tripBudgetInput" min="0" step="10000">
-      </div>
       <button class="toolbtn" id="saveTripBtn" style="width:100%; justify-content:center;">현재 여행 정보 저장</button>
-    </div>
-
-    <div class="block">
-      <h4>카테고리별 예산 (선택)</h4>
-      <div id="categoryBudgetRows"></div>
-      <p class="note" style="margin-top:6px;">비워두면 해당 카테고리는 예산 진행률에 표시되지 않습니다.</p>
-    </div>
-
-    <div class="block">
-      <h4>국가별 예산 (선택)</h4>
-      <div id="countryBudgetRows"></div>
-      <p class="note" style="margin-top:6px;">비워두면 해당 국가는 예산 진행률에 표시되지 않습니다.</p>
     </div>
 
     <div class="block">
@@ -919,7 +883,7 @@
       countries: DEFAULT_COUNTRIES.slice(),
       currencies: DEFAULT_CURRENCIES.slice(),
       cardTypes: DEFAULT_CARD_TYPES.slice(),
-      trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "", budget: 0 }],
+      trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "" }],
       currentTripId: tripId,
       expenses: [],
       itineraryDays: [],
@@ -938,14 +902,10 @@
     if(!d.cardTypes || !d.cardTypes.length) d.cardTypes = DEFAULT_CARD_TYPES.slice();
     if(!d.trips || !d.trips.length){
       const tripId = uid();
-      d.trips = [{ id: tripId, name: "새 여행", startDate: "", endDate: "", budget: 0 }];
+      d.trips = [{ id: tripId, name: "새 여행", startDate: "", endDate: "" }];
       d.currentTripId = tripId;
     }
     if(!d.currentTripId || !d.trips.find(t => t.id === d.currentTripId)) d.currentTripId = d.trips[0].id;
-    d.trips.forEach(t => {
-      if(!t.categoryBudgets || typeof t.categoryBudgets !== 'object') t.categoryBudgets = {};
-      if(!t.countryBudgets || typeof t.countryBudgets !== 'object') t.countryBudgets = {};
-    });
     if(!d.expenses) d.expenses = [];
     if(!d.itineraryDays) d.itineraryDays = [];
     if(!d.timelineByTrip) d.timelineByTrip = {};
@@ -994,12 +954,6 @@
       if(idx !== -1 && !d.categories.includes('음료/간식')){
         d.categories[idx] = '음료/간식';
         (d.expenses||[]).forEach(e => { if(e.category === '음료') e.category = '음료/간식'; });
-        (d.trips||[]).forEach(t => {
-          if(t.categoryBudgets && Object.prototype.hasOwnProperty.call(t.categoryBudgets, '음료')){
-            t.categoryBudgets['음료/간식'] = t.categoryBudgets['음료'];
-            delete t.categoryBudgets['음료'];
-          }
-        });
       }
       d._migrations.renameBeverageCategory = true;
     }
@@ -1294,25 +1248,6 @@
     `).join('');
   }
 
-  // 카테고리별/국가별 예산 입력 행 렌더 — 실제 진행률 표시는 지출 탭의 "예산 진행률" 패널에서 한다.
-  function renderBudgetRows(){
-    const trip = currentTrip();
-    el('categoryBudgetRows').innerHTML = data.categories.map(c => `
-      <div class="budget-row" data-cat="${escapeHtml(c)}">
-        <span class="budget-label">${escapeHtml(c)}</span>
-        <input type="number" min="0" step="10000" inputmode="numeric" placeholder="예산 (원)" value="${trip.categoryBudgets[c] || ''}">
-        <button data-save-catbudget="${escapeHtml(c)}">저장</button>
-      </div>
-    `).join('');
-    el('countryBudgetRows').innerHTML = data.countries.map(c => `
-      <div class="budget-row" data-country="${escapeHtml(c)}">
-        <span class="budget-label">${countryFlag(c)} ${escapeHtml(c)}</span>
-        <input type="number" min="0" step="10000" inputmode="numeric" placeholder="예산 (원)" value="${trip.countryBudgets[c] || ''}">
-        <button data-save-countrybudget="${escapeHtml(c)}">저장</button>
-      </div>
-    `).join('');
-  }
-
   // ---------- 필터/정렬 ----------
   let searchTerm = '';
   let filterCategories = new Set();
@@ -1384,44 +1319,6 @@
         <div class="cbar-track"><div class="cbar-fill" style="width:${(e.amt/max*100).toFixed(1)}%; background:${color};"></div></div>
       </div>`;
     }).join('');
-  }
-
-  // ---------- 렌더: 카테고리·나라별 예산 진행률 ----------
-  // 설정에서 예산을 설정해둔 카테고리/국가만 보여준다(설정 안 하면 진행률 패널 자체가 숨겨짐).
-  function renderBudgetProgress(){
-    const trip = currentTrip();
-    const list = tripExpenses(trip.id);
-    const catBudgets = Object.entries(trip.categoryBudgets||{}).filter(([,v]) => Number(v) > 0);
-    const countryBudgets = Object.entries(trip.countryBudgets||{}).filter(([,v]) => Number(v) > 0);
-    const panel = el('budgetProgressPanel');
-    if(!catBudgets.length && !countryBudgets.length){ panel.style.display = 'none'; return; }
-    panel.style.display = '';
-
-    const catSpent = {};
-    const countrySpent = {};
-    list.forEach(e => {
-      catSpent[e.category] = (catSpent[e.category]||0) + e.amountKrw;
-      countrySpent[e.country] = (countrySpent[e.country]||0) + e.amountKrw;
-    });
-
-    function barRow(nameHtml, spent, budget){
-      const pct = budget > 0 ? (spent/budget*100) : 0;
-      const over = pct > 100;
-      const fillPct = Math.min(pct, 100);
-      const color = over ? 'var(--warn)' : 'var(--accent)';
-      return `<div class="cbar-row">
-        <div class="cbar-head"><b>${nameHtml}</b><span class="tabular">${won(spent)} / ${won(budget)}${over ? ' <b style="color:var(--warn);">초과</b>' : ''}</span></div>
-        <div class="cbar-track"><div class="cbar-fill" style="width:${fillPct.toFixed(1)}%; background:${color};"></div></div>
-      </div>`;
-    }
-
-    const catHtml = catBudgets.map(([name, budget]) => barRow(escapeHtml(name), catSpent[name]||0, Number(budget))).join('');
-    const countryHtml = countryBudgets.map(([name, budget]) => barRow(`${countryFlag(name)} ${escapeHtml(name)}`, countrySpent[name]||0, Number(budget))).join('');
-
-    el('budgetProgressBody').innerHTML = `
-      ${catHtml ? `<div class="budget-progress-group"><div class="budget-progress-label">카테고리</div>${catHtml}</div>` : ''}
-      ${countryHtml ? `<div class="budget-progress-group"><div class="budget-progress-label">국가</div>${countryHtml}</div>` : ''}
-    `;
   }
 
   // ---------- 일자 라벨 ----------
@@ -1675,7 +1572,6 @@
     renderCurrencyOptions();
     renderCardTypeOptions();
     renderChips();
-    renderBudgetRows();
     renderFilterChips();
     renderStorageUsage();
     renderBackupSettings();
@@ -1683,8 +1579,6 @@
     const trip = currentTrip();
     const list = tripExpenses(trip.id);
     const spent = list.reduce((s,e)=>s+e.amountKrw,0);
-    const budget = Number(trip.budget) || 0;
-    const remain = budget - spent;
 
     let dayCount = '';
     if(trip.startDate && trip.endDate){
@@ -1693,21 +1587,22 @@
       dayCount = ` · ${total}일 여행`;
     }
     el('tripLabel').textContent = `${trip.name} · ${list.length}건${dayCount}`;
-    el('budgetView').textContent = won(budget);
     el('spentView').textContent = won(spent);
-    el('remainView').textContent = won(remain);
-    el('countView').textContent = list.length + '건';
+
+    const catTotals = {};
+    list.forEach(e => { catTotals[e.category] = (catTotals[e.category]||0) + e.amountKrw; });
+    const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+    const topCatHtml = topCat ? ` · 최다 <b>${escapeHtml(topCat[0])} ${Math.round(topCat[1]/(spent||1)*100)}%</b>` : '';
+    el('heroSubLine').innerHTML = `<b>${list.length}건</b>${dayCount}${topCatHtml}`;
 
     el('newDate').value = (trip.startDate && todayStr() < trip.startDate) ? trip.startDate : (trip.startDate && todayStr() > trip.endDate ? trip.endDate : todayStr());
 
     el('tripNameInput').value = trip.name;
     el('tripStartInput').value = trip.startDate || '';
     el('tripEndInput').value = trip.endDate || '';
-    el('tripBudgetInput').value = trip.budget || '';
 
     renderCategoryPanel();
     renderCountryPanel();
-    renderBudgetProgress();
     renderDayGroups();
   }
 
@@ -1739,7 +1634,7 @@
     const name = el('newTripName').value.trim();
     if(!name){ showToast('여행 이름을 입력해주세요'); return; }
     const id = uid();
-    data.trips.push({ id, name, startDate:"", endDate:"", budget:0, categoryBudgets:{}, countryBudgets:{} });
+    data.trips.push({ id, name, startDate:"", endDate:"" });
     data.currentTripId = id;
     saveData(data);
     el('newTripName').value = '';
@@ -1751,7 +1646,6 @@
     trip.name = el('tripNameInput').value.trim() || trip.name;
     trip.startDate = el('tripStartInput').value || '';
     trip.endDate = el('tripEndInput').value || '';
-    trip.budget = Math.max(0, Number(el('tripBudgetInput').value) || 0);
     saveData(data);
     render();
     showToast('여행 정보가 저장되었습니다');
@@ -1768,23 +1662,6 @@
     saveData(data);
     render();
     showToast('여행이 삭제되었습니다');
-  });
-
-  // ---------- 예산 인라인 수정 ----------
-  el('budgetCard').addEventListener('click', () => {
-    if(el('budgetCard').querySelector('input')) return;
-    const trip = currentTrip();
-    const view = el('budgetView');
-    view.outerHTML = `<input type="number" class="editv" id="budgetView" value="${trip.budget||0}" min="0" step="10000">`;
-    const input = el('budgetView');
-    input.focus(); input.select();
-    function commit(){
-      trip.budget = Math.max(0, Number(input.value)||0);
-      saveData(data);
-      render();
-    }
-    input.addEventListener('blur', commit);
-    input.addEventListener('keydown', ev => { if(ev.key==='Enter') input.blur(); });
   });
 
   // ---------- 필터/정렬 ----------
@@ -2776,32 +2653,6 @@
     showToast(skippedCount ? `${addedCount}개 추가, ${skippedCount}개는 정보 부족으로 건너뜀` : `${addedCount}개 지출을 일괄 추가했습니다`);
   });
 
-  // ---------- 카테고리/국가별 예산 저장 ----------
-  el('categoryBudgetRows').addEventListener('click', e => {
-    const cat = e.target.dataset.saveCatbudget;
-    if(!cat) return;
-    const row = e.target.closest('.budget-row');
-    const val = Math.max(0, Number(row.querySelector('input').value) || 0);
-    const trip = currentTrip();
-    if(val > 0) trip.categoryBudgets[cat] = val; else delete trip.categoryBudgets[cat];
-    saveData(data);
-    e.target.classList.add('saved');
-    renderBudgetProgress();
-    showToast(val > 0 ? `'${cat}' 예산이 ${won(val)}으로 저장되었습니다` : `'${cat}' 예산 설정이 해제되었습니다`);
-  });
-  el('countryBudgetRows').addEventListener('click', e => {
-    const country = e.target.dataset.saveCountrybudget;
-    if(!country) return;
-    const row = e.target.closest('.budget-row');
-    const val = Math.max(0, Number(row.querySelector('input').value) || 0);
-    const trip = currentTrip();
-    if(val > 0) trip.countryBudgets[country] = val; else delete trip.countryBudgets[country];
-    saveData(data);
-    e.target.classList.add('saved');
-    renderBudgetProgress();
-    showToast(val > 0 ? `'${country}' 예산이 ${won(val)}으로 저장되었습니다` : `'${country}' 예산 설정이 해제되었습니다`);
-  });
-
   // ---------- 카테고리/국가/통화 관리 ----------
   el('addCategoryBtn').addEventListener('click', () => {
     const input = el('newCategoryInput');
@@ -2818,12 +2669,6 @@
       const newName = promptRename(renameName, '카테고리');
       if(newName) renameListValue(data.categories, renameName, newName, (oldN, newN) => {
         data.expenses.forEach(exp => { if(exp.category === oldN) exp.category = newN; });
-        data.trips.forEach(t => {
-          if(t.categoryBudgets && Object.prototype.hasOwnProperty.call(t.categoryBudgets, oldN)){
-            t.categoryBudgets[newN] = t.categoryBudgets[oldN];
-            delete t.categoryBudgets[oldN];
-          }
-        });
         if(filterCategories.has(oldN)){ filterCategories.delete(oldN); filterCategories.add(newN); }
       });
       return;
@@ -2831,7 +2676,6 @@
     const name = e.target.dataset.removeCat;
     if(!name) return;
     data.categories = data.categories.filter(c=>c!==name);
-    data.trips.forEach(t => { if(t.categoryBudgets) delete t.categoryBudgets[name]; });
     saveData(data); render();
   });
   el('addCountryBtn').addEventListener('click', () => {
@@ -2849,12 +2693,6 @@
       const newName = promptRename(renameName, '국가');
       if(newName) renameListValue(data.countries, renameName, newName, (oldN, newN) => {
         data.expenses.forEach(exp => { if(exp.country === oldN) exp.country = newN; });
-        data.trips.forEach(t => {
-          if(t.countryBudgets && Object.prototype.hasOwnProperty.call(t.countryBudgets, oldN)){
-            t.countryBudgets[newN] = t.countryBudgets[oldN];
-            delete t.countryBudgets[oldN];
-          }
-        });
         if(filterCountries.has(oldN)){ filterCountries.delete(oldN); filterCountries.add(newN); }
       });
       return;
@@ -2862,7 +2700,6 @@
     const name = e.target.dataset.removeCountry;
     if(!name) return;
     data.countries = data.countries.filter(c=>c!==name);
-    data.trips.forEach(t => { if(t.countryBudgets) delete t.countryBudgets[name]; });
     saveData(data); render();
   });
   el('addCurrencyBtn').addEventListener('click', () => {
