@@ -152,10 +152,17 @@
   .amount-range-row span{ color:var(--ink3); font-size:12px; }
 
   .daygroup{ margin-bottom:22px; }
-  .daygroup-head{ display:flex; justify-content:space-between; align-items:baseline; padding:6px 4px; border-bottom:1.5px solid var(--line2); margin-bottom:2px; }
+  .daygroup-head{ display:flex; justify-content:space-between; align-items:baseline; padding:6px 4px; border-bottom:1.5px solid var(--line2); margin-bottom:2px; cursor:pointer; user-select:none; }
   .daygroup-head .dtitle{ font-weight:700; font-size:13px; }
   .daygroup-head .dtitle .ddate{ font-weight:500; color:var(--ink2); font-size:11.5px; margin-left:6px; }
   .daygroup-head .dtotal{ font-size:12.5px; font-weight:700; color:var(--ink2); }
+  .daygroup-chevron{ display:inline-block; width:14px; color:var(--ink2); font-size:11px; }
+  .daygroup-count{ font-weight:500; color:var(--ink2); font-size:11.5px; margin-right:6px; }
+  .daygroup-body{ }
+
+  .summary-panels-wrap{ margin-bottom:24px; }
+  .summary-panels-toggle{ width:100%; text-align:center; padding:9px 0; margin-bottom:10px; border:1.5px solid var(--line2); border-radius:10px; background:var(--surface); color:var(--ink2); font-size:12.5px; font-weight:700; cursor:pointer; }
+  .summary-panels-body .panels{ margin-top:0; }
 
   .day-stats{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; padding:0 4px; }
   .day-stat{
@@ -548,20 +555,25 @@
 
     <div id="expenseTabPanel">
 
-    <div class="panels">
-      <div class="panel">
-        <div class="panel-title">카테고리별 비중</div>
-        <div id="categoryPanel"></div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">국가별 지출 비교</div>
-        <div id="countryPanel"></div>
-      </div>
-    </div>
+    <div class="summary-panels-wrap">
+      <button type="button" class="summary-panels-toggle" id="summaryPanelsToggle">요약 보기 ▾</button>
+      <div class="summary-panels-body" id="summaryPanelsBody">
+        <div class="panels">
+          <div class="panel">
+            <div class="panel-title">카테고리별 비중</div>
+            <div id="categoryPanel"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">국가별 지출 비교</div>
+            <div id="countryPanel"></div>
+          </div>
+        </div>
 
-    <div class="panel" style="margin-bottom:24px;">
-      <div class="panel-title">결제수단별 지출 비중</div>
-      <div id="paymentPanel"></div>
+        <div class="panel" style="margin-bottom:24px;">
+          <div class="panel-title">결제수단별 지출 비중</div>
+          <div id="paymentPanel"></div>
+        </div>
+      </div>
     </div>
 
     <div class="sectionhead">
@@ -887,6 +899,8 @@
   "use strict";
   const STORAGE_KEY = "travel_budget_app_v1";
   const THEME_KEY = "travel_budget_theme_v1";
+  const DAY_COLLAPSE_KEY = "travel_budget_daycollapse_v1"; // { [dateStr]: 'open'|'closed' } - 기기별 UI 상태, data 백업에는 포함하지 않음
+  const PANELS_COLLAPSED_KEY = "travel_budget_panelscollapsed_v1"; // 'open'|'closed'
 
   const DEFAULT_CATEGORIES = ["식사","숙소","교통","기타"];
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
@@ -1239,19 +1253,23 @@
   // 문자/사진 인식으로 채워진 날짜·시각이 아직 "한국시간 그대로"인 상태를 기억해뒀다가,
   // 국가를 선택(변경)하면 그 국가의 현지시각으로 자동 환산한다. 사용자가 날짜/시각을 직접 고치면 비운다.
   let pendingKstDateTime = null;
+  // 반환값으로 "실제로 어느 국가 기준으로 변환했는지"를 알려준다 — 호출부(문자/사진 인식 요약문 등)가
+  // 이걸 화면에 그대로 보여줘서, 국가가 잘못 선택된 상태로 조용히 엉뚱한 시차가 적용되는 걸 사용자가
+  // 바로 알아챌 수 있게 한다(이전에는 변환은 되지만 결과를 요약문에서 확인할 길이 없었다).
   function applyTimezoneConversion(silent){
-    if(!pendingKstDateTime) return;
+    if(!pendingKstDateTime) return null;
     const country = el('newCountry').value;
-    if(!country || country === '__addnew__') return;
-    if(country === '한국' || country === '대한민국') return; // 이미 한국시간이므로 변환 불필요
+    if(!country || country === '__addnew__') return null;
+    if(country === '한국' || country === '대한민국') return null; // 이미 한국시간이므로 변환 불필요
     const offset = countryUtcOffset(country, pendingKstDateTime.date);
     if(offset == null){
       if(!silent) showToast(`"${country}"의 시차 정보가 없어 한국시간 그대로 두었습니다. 직접 확인해주세요.`);
-      return;
+      return null;
     }
     const converted = convertKstToLocal(pendingKstDateTime.date, pendingKstDateTime.time, offset);
     el('newDate').value = converted.date;
     el('newTime').value = converted.time;
+    return { country, offset, date: converted.date, time: converted.time };
   }
   el('newDate').addEventListener('input', () => { pendingKstDateTime = null; });
   el('newTime').addEventListener('input', () => { pendingKstDateTime = null; });
@@ -1330,7 +1348,16 @@
     const sel = el('newCountry');
     const prev = sel.value;
     sel.innerHTML = data.countries.map(c => `<option value="${c}">${countryFlag(c)} ${c}</option>`).join('') + '<option value="__addnew__">+ 새 국가 추가</option>';
-    if(data.countries.includes(prev)) sel.value = prev;
+    if(data.countries.includes(prev)){
+      sel.value = prev;
+    } else {
+      // 새로고침 직후 등 아직 아무 것도 선택 안 된 상태면, 목록 맨 앞 국가가 아니라 이번 트립에서
+      // 가장 최근에 추가한 지출의 국가를 기본값으로 쓴다. 카드승인 문자를 붙여넣는 순간 이 값 기준으로
+      // 한국시간→현지시간 자동 환산이 되므로(국가를 따로 안 건드리면 바뀐 걸 눈치채기 어렵다),
+      // 엉뚱한 기본 국가(목록 맨 앞)로 조용히 잘못 계산되는 걸 막기 위한 안전장치다.
+      const recent = tripExpenses(data.currentTripId).slice(-1)[0];
+      sel.value = (recent && data.countries.includes(recent.country)) ? recent.country : (data.countries[0] || '');
+    }
   }
   // 상세 필터(카테고리/국가 복수선택 + 금액범위) 칩 렌더
   function renderFilterChips(){
@@ -1708,6 +1735,9 @@
     });
     if(sortOrder === 'date_desc') order.reverse();
 
+    // 실제 달력 날짜 기준으로 가장 최근 2일만 기본으로 펼쳐두고, 지나간 날은 기본 접힘 처리한다.
+    const recentDates = new Set(Object.keys(groups).sort((a,b)=> b.localeCompare(a)).slice(0,2));
+
     el('dayGroups').innerHTML = order.map(dateStr => {
       const items = groups[dateStr];
       const dayTotal = items.reduce((s,e)=>s+e.amountKrw,0);
@@ -1716,12 +1746,18 @@
       const day = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
       const note = day ? (day.note || '') : '';
       const sortedItems = sortDayItemsChronologically(items);
+      const collapsed = isDayCollapsed(dateStr, recentDates.has(dateStr));
       return `<div class="daygroup" data-day="${dateStr}">
-        <div class="daygroup-head"><span class="dtitle">${dateLabel}</span><span class="dtotal tabular">${won(dayTotal)}</span></div>
-        ${sortedItems.map(rowHtml).join('')}
-        ${dayStatsHtml(items)}
-        ${dayRouteHtml(dateStr, sortedItems)}
-        ${dayNoteHtml(dateStr, note)}
+        <div class="daygroup-head" data-day-toggle="${dateStr}" data-collapsed="${collapsed}">
+          <span class="dtitle"><span class="daygroup-chevron">${collapsed ? '▸' : '▾'}</span>${dateLabel}</span>
+          <span class="dtotal tabular">${collapsed ? `<span class="daygroup-count">${items.length}건</span>` : ''}${won(dayTotal)}</span>
+        </div>
+        <div class="daygroup-body"${collapsed ? ' style="display:none;"' : ''}>
+          ${sortedItems.map(rowHtml).join('')}
+          ${dayStatsHtml(items)}
+          ${dayRouteHtml(dateStr, sortedItems)}
+          ${dayNoteHtml(dateStr, note)}
+        </div>
       </div>`;
     }).join('');
     autoGrowAllDayNotes();
@@ -1888,6 +1924,7 @@
     renderCategoryPanel();
     renderCountryPanel();
     renderPaymentPanel();
+    renderPanelsToggle();
     renderDayGroups();
     renderBulkBar();
   }
@@ -2078,7 +2115,7 @@
     // 카드승인 문자/캡처의 날짜·시각은 한국시간 기준이므로, 국가가 선택되어 있으면(또는 이후 선택하면)
     // 현지시각으로 자동 환산되도록 표시해둔다.
     pendingKstDateTime = (parsed.date && parsed.time) ? { date: parsed.date, time: parsed.time } : null;
-    applyTimezoneConversion(true);
+    const tzResult = applyTimezoneConversion(true);
 
     if(parsed.currency && data.currencies.includes(parsed.currency)){
       el('newCurrency').value = parsed.currency;
@@ -2095,12 +2132,21 @@
     }
     updateFxPreview();
 
+    // 날짜/시각은 el()에서 "현재 입력칸에 실제로 채워진 값"을 다시 읽는다 — 시차 변환이 일어났으면
+    // 그 결과가, 아니면 원래 파싱된 한국시간이 그대로 요약문에 보인다(이전엔 시각이 아예 요약에 없어서
+    // 시차가 잘못 적용돼도 "+ 추가"를 누르기 전까진 알아챌 방법이 없었다).
+    const curDate = el('newDate').value;
+    const curTime = el('newTime').value;
     const parts = [];
-    if(parsed.date) parts.push(parsed.date.slice(5).replace('-','.'));
+    if(curDate) parts.push(curDate.slice(5).replace('-','.'));
+    if(curTime) parts.push(curTime);
     if(parsed.item) parts.push(parsed.item);
     if(parsed.foreignAmount && parsed.currency) parts.push(`${parsed.foreignAmount} ${parsed.currency}`);
     else if(parsed.krwAmount) parts.push(won(parsed.krwAmount));
-    return parts.join(' · ');
+    let summary = parts.join(' · ');
+    if(tzResult) summary += ` (🌍 ${tzResult.country} 현지시간 기준으로 변환됨)`;
+    else if(pendingKstDateTime) summary += ` (🇰🇷 아직 한국시간 — 국가를 선택하면 현지시간으로 바뀝니다)`;
+    return summary;
   }
 
   function applySmsParse(){
@@ -2380,6 +2426,13 @@
   // ---------- 수정/삭제/영수증 보기/펼치기 ----------
   let suppressRowToggle = false;
   el('dayGroups').addEventListener('click', e => {
+    const dayToggleEl = e.target.closest('[data-day-toggle]');
+    if(dayToggleEl){
+      const dateStr = dayToggleEl.dataset.dayToggle;
+      const wasCollapsed = dayToggleEl.dataset.collapsed === 'true';
+      toggleDayCollapse(dateStr, wasCollapsed);
+      return;
+    }
     const mmBtn = e.target.closest('[data-mm-lat]');
     if(mmBtn){
       const lat = mmBtn.dataset.mmLat, lng = mmBtn.dataset.mmLng;
@@ -2812,6 +2865,9 @@
       // 필터가 걸려 있으면 해당 날짜 카드가 화면에 없을 수 있어 초기화하고 이동한다
       searchTerm=''; filterCategories.clear(); filterCountries.clear(); filterAmountMin=null; filterAmountMax=null;
       el('searchInput').value=''; el('filterAmountMin').value=''; el('filterAmountMax').value='';
+      // 필터가 없어졌으니 접힌 상태로 이동하면 내용이 안 보일 수 있어, 이동할 날짜는 펼쳐둔다
+      dayCollapseOverrides[dateStr] = 'open';
+      saveDayCollapseOverrides();
       render();
       const target = document.querySelector(`.daygroup[data-day="${dateStr}"]`);
       if(target) target.scrollIntoView({ behavior:'smooth', block:'start' });
@@ -3174,6 +3230,61 @@
     applyTheme(next);
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
   });
+
+  el('summaryPanelsToggle').addEventListener('click', toggleSummaryPanels);
+
+  // ---------- Day 그룹 접기 상태 (기기별로 기억) ----------
+  let dayCollapseOverrides = {};
+  (function initDayCollapse(){
+    try{
+      const saved = localStorage.getItem(DAY_COLLAPSE_KEY);
+      if(saved) dayCollapseOverrides = JSON.parse(saved) || {};
+    }catch(e){ dayCollapseOverrides = {}; }
+  })();
+  function saveDayCollapseOverrides(){
+    try{ localStorage.setItem(DAY_COLLAPSE_KEY, JSON.stringify(dayCollapseOverrides)); }catch(e){}
+  }
+  function isFilterActive(){
+    return !!searchTerm || filterCategories.size > 0 || filterCountries.size > 0 || filterAmountMin != null || filterAmountMax != null;
+  }
+  // 기본값: 가장 최근 날짜 2개는 펼침, 그 이전 날짜는 접힘 상태로 시작한다.
+  // 사용자가 특정 날짜를 직접 펼치거나 접으면 그 선택을 기기에 저장해두고 다음에도 그대로 유지한다.
+  function isDayCollapsed(dateStr, isRecent){
+    if(isFilterActive()) return false; // 검색/필터 중에는 결과가 가려지지 않도록 항상 펼침
+    const override = dayCollapseOverrides[dateStr];
+    if(override === 'open') return false;
+    if(override === 'closed') return true;
+    return !isRecent;
+  }
+  function toggleDayCollapse(dateStr, wasCollapsed){
+    dayCollapseOverrides[dateStr] = wasCollapsed ? 'open' : 'closed';
+    saveDayCollapseOverrides();
+    renderDayGroups();
+  }
+
+  // ---------- 상단 요약 패널 접기 상태 (기기별로 기억) ----------
+  let panelsCollapsed = true; // 기본값: 접힌 상태로 시작(스크롤 절약)
+  (function initPanelsCollapsed(){
+    try{
+      const saved = localStorage.getItem(PANELS_COLLAPSED_KEY);
+      if(saved) panelsCollapsed = (saved === 'closed');
+    }catch(e){}
+  })();
+  function savePanelsCollapsed(){
+    try{ localStorage.setItem(PANELS_COLLAPSED_KEY, panelsCollapsed ? 'closed' : 'open'); }catch(e){}
+  }
+  function renderPanelsToggle(){
+    const body = el('summaryPanelsBody');
+    const btn = el('summaryPanelsToggle');
+    if(!body || !btn) return;
+    body.style.display = panelsCollapsed ? 'none' : '';
+    btn.textContent = panelsCollapsed ? '요약 보기 ▾' : '요약 접기 ▴';
+  }
+  function toggleSummaryPanels(){
+    panelsCollapsed = !panelsCollapsed;
+    savePanelsCollapsed();
+    renderPanelsToggle();
+  }
 
   // ---------- 설정 드로어 ----------
   function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); }
