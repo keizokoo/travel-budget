@@ -2035,13 +2035,29 @@
 
   // ---------- 카드 승인 문자 붙여넣기 자동인식 (해외승인 포함) ----------
   function parseSmsExpense(text){
-    const t = (text || '').replace(/\s+/g, ' ').trim();
+    const rawText = text || '';
+    const t = rawText.replace(/\s+/g, ' ').trim();
     if(!t) return null;
 
-    // 통화코드 탐지 (해외승인: "USD 45.00" 형태 등)
+    // 국가약칭 접두어 감지: 일부 카드사(국민카드 등)는 해외승인 문자에서 국가약칭을 공백으로
+    // 폭 맞춤한 뒤 가맹점명을 이어붙여 한 줄로 보낸다(예: "스페   MP**MARKET"). 공백을 압축하기 전
+    // 원문에서 "짧은 한글 토큰 + 공백 2칸 이상" 패턴을 찾아 그 토큰을 국가약칭으로 간주해두고,
+    // 아래에서 뽑아낸 가맹점명 앞에 그대로 붙어있으면 제거한다(일반 가맹점명은 이 패턴과 우연히도
+    // 겹치기 어려움 — 짧은 순수 한글 토큰 뒤에 공백 2칸 이상이 오는 경우가 매우 드묾).
+    let countryAbbrPrefix = null;
+    for(const line of rawText.split('\n')){
+      const pm = line.match(/^\s*([가-힣]{1,4})\s{2,}\S/);
+      if(pm){ countryAbbrPrefix = pm[1]; break; }
+    }
+
+    // 통화코드 탐지 (해외승인: "USD 45.00" 형태, 국민카드처럼 "10.36(EUR)"처럼 금액이 앞에 오는 형태 등)
     let currency = null, foreignAmount = null;
-    const fxm = t.match(/\b(USD|EUR|GBP|JPY|CNY)\s*([\d][\d,.]*)/i);
+    let fxm = t.match(/\b(USD|EUR|GBP|JPY|CNY)\s*([\d][\d,.]*)/i);
     if(fxm){ currency = fxm[1].toUpperCase(); foreignAmount = parseFloat(fxm[2].replace(/,/g,'')); }
+    else {
+      fxm = t.match(/([\d][\d,.]*)\s*\(\s*(USD|EUR|GBP|JPY|CNY)\s*\)/i);
+      if(fxm){ foreignAmount = parseFloat(fxm[1].replace(/,/g,'')); currency = fxm[2].toUpperCase(); }
+    }
 
     // 원화 금액: "원화환산 76,500원" / "(₩76,500)" 라벨을 최우선으로, 그 다음 "81,800원 일시불" 형태
     let krwAmount = null;
@@ -2095,6 +2111,9 @@
     if(!item && dm){
       let tail = t.slice(t.indexOf(dm[0]) + dm[0].length).trim();
       item = trimTail(tail);
+    }
+    if(countryAbbrPrefix && item.startsWith(countryAbbrPrefix + ' ')){
+      item = item.slice(countryAbbrPrefix.length).trim();
     }
 
     // 카테고리 추정: 등록된 카테고리 이름이 문자에 그대로 있으면 사용 (드묾, 보통 못 맞춤 -> 사용자가 확인)
