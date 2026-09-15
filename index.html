@@ -2050,13 +2050,19 @@
       if(pm){ countryAbbrPrefix = pm[1]; break; }
     }
 
-    // 통화코드 탐지 (해외승인: "USD 45.00" 형태, 국민카드처럼 "10.36(EUR)"처럼 금액이 앞에 오는 형태 등)
+    // 통화코드 탐지 (해외승인: "USD 45.00" 형태, 국민카드처럼 "10.36(EUR)"처럼 금액이 앞에 오는 형태,
+    // 신한카드처럼 "17.20 유로"처럼 통화코드 대신 한글 통화명이 오는 형태 등)
     let currency = null, foreignAmount = null;
     let fxm = t.match(/\b(USD|EUR|GBP|JPY|CNY)\s*([\d][\d,.]*)/i);
     if(fxm){ currency = fxm[1].toUpperCase(); foreignAmount = parseFloat(fxm[2].replace(/,/g,'')); }
     else {
       fxm = t.match(/([\d][\d,.]*)\s*\(\s*(USD|EUR|GBP|JPY|CNY)\s*\)/i);
       if(fxm){ foreignAmount = parseFloat(fxm[1].replace(/,/g,'')); currency = fxm[2].toUpperCase(); }
+    }
+    if(!fxm){
+      const KOREAN_CURRENCY_WORDS = { '유로':'EUR', '달러':'USD', '파운드':'GBP', '위안화':'CNY', '위안':'CNY', '엔':'JPY' };
+      const kwm = t.match(/([\d][\d,.]*)\s*(유로|달러|파운드|위안화|위안|엔)/);
+      if(kwm){ foreignAmount = parseFloat(kwm[1].replace(/,/g,'')); currency = KOREAN_CURRENCY_WORDS[kwm[2]]; }
     }
 
     // 원화 금액: "원화환산 76,500원" / "(₩76,500)" 라벨을 최우선으로, 그 다음 "81,800원 일시불" 형태
@@ -2072,10 +2078,14 @@
       if(m){ krwAmount = parseInt(m[1].replace(/,/g,''), 10); }
     }
     if(!krwAmount){
+      // "누적"/"잔액" 뒤에 붙은 숫자(이번 거래 금액이 아니라 누적 사용액·잔여한도)는 애초에 후보에서
+      // 제외한다. 예전엔 그 외 후보가 하나도 없으면 어쩔 수 없이 그 누적액을 그대로 썼는데,
+      // (예: "17.20 유로 ... 누적1,330,211원"처럼 해외통화 거래라 원화 표기가 아예 없는 경우)
+      // 실제 거래액과 무관한 큰 숫자가 잘못 채워지는 사고로 이어져서, 이제는 후보가 없으면 그냥
+      // 비워둔다(사용자가 직접 입력).
       const all = [...t.matchAll(/([\d,]{3,})\s*원/g)];
       const nonAccum = all.filter(x => !/(누적|잔액)\s*$/.test(t.slice(0, x.index)));
-      const pick = nonAccum.length ? nonAccum[0] : all[0];
-      if(pick) krwAmount = parseInt(pick[1].replace(/,/g,''), 10);
+      if(nonAccum.length) krwAmount = parseInt(nonAccum[0][1].replace(/,/g,''), 10);
     }
 
     // 날짜 MM/DD
