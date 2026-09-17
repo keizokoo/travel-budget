@@ -832,6 +832,13 @@
       <p class="note">현재 선택된 여행과 그 안의 모든 지출 내역이 삭제됩니다. 되돌릴 수 없으니 먼저 내보내기로 백업해두세요.</p>
       <button class="toolbtn warn-btn" id="deleteTripBtn" style="width:100%; justify-content:center; border-color:var(--warn); color:var(--warn);">이 여행 삭제</button>
     </div>
+
+    <div class="block">
+      <h4>앱 정보 · 수정 이력</h4>
+      <p class="note" id="appBuildInfo" style="margin-bottom:10px;"></p>
+      <p class="note" style="margin-bottom:8px;">지금 보고 있는 화면이 최신 수정사항을 포함하는지 여기서 확인할 수 있습니다. 여기 날짜가 최근 요청한 수정보다 오래됐다면, 전달받은 최신 파일로 아직 교체·재설치가 안 된 것입니다(특히 PWA로 설치해 썼다면 캐시 때문에 새로고침만으로는 안 바뀔 수 있어요 — 파일을 다시 받아 덮어쓰고 앱을 완전히 종료 후 재실행해주세요).</p>
+      <div id="changelogList"></div>
+    </div>
   </div>
 </div>
 
@@ -906,6 +913,17 @@
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
   const DEFAULT_CARD_TYPES = ["MG","원더","비즈"];
+
+  // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
+  // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
+  // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
+  const APP_BUILD = '2026-09-17-01';
+  const CHANGELOG = [
+    { date: '2026-09-17', note: '"오늘 동선 전체보기"에서 좌표를 못 찾은 장소(짧은 공유링크 등)는 도시·국가를 붙여서 검색하도록 개선 — 맥도날드 등 흔한 체인점의 정확한 지점을 더 잘 찾음. "앱 정보 · 수정 이력" 화면 추가.' },
+    { date: '2026-09-15', note: '신한카드 해외승인 문자(통화코드 대신 "유로" 같은 한글 통화명 표기) 인식 추가. 원화 금액을 못 찾을 때 누적잔액 숫자가 거래금액으로 잘못 채워지던 버그 수정.' },
+    { date: '2026-09-13', note: '국민카드 해외승인 문자("금액(통화코드)" 순서, 예: 10.36(EUR)) 인식 추가. 가맹점명 앞에 붙는 국가약칭(예: "스페") 자동 제거.' },
+    { date: '2026-09-12', note: '지난 Day 전체 접기 + 상단 요약 3패널 접이식, 접은 상태 기억(새로고침 후에도 유지).' }
+  ];
 
   const TAG_COLOR_PALETTE = ["#C1440E","#2F6FE0","#1F8A6B","#9B5CF0","#B08900","#5B7A99","#C1447A"];
   function tagColor(list, name){
@@ -1863,6 +1881,23 @@
       el('storageBarFill').style.width = pct.toFixed(1) + '%';
       el('storageNote').textContent = `약 ${mb.toFixed(2)}MB 사용 중 (브라우저별로 한도가 달라 참고용입니다)`;
     }catch(e){}
+  }
+
+  // 설정 화면의 "앱 정보 · 수정 이력"을 채운다. 지금 이 화면이 최신 수정사항을 포함하고 있는지
+  // 사용자가 스스로 확인할 수 있게 해서 "고쳤다고 했는데 그대로다"라는 혼동(대개는 파일 교체/PWA
+  // 재설치가 아직 안 된 경우)을 줄이기 위한 용도. CHANGELOG는 수정할 때마다 맨 위에 항목을 추가한다.
+  function renderAppInfo(){
+    const buildEl = el('appBuildInfo');
+    if(buildEl) buildEl.textContent = `버전 ${APP_BUILD}` + (CHANGELOG[0] ? ` · 최근 수정 ${CHANGELOG[0].date}` : '');
+    const listEl = el('changelogList');
+    if(listEl){
+      listEl.innerHTML = CHANGELOG.map(c => `
+        <div style="padding:8px 0; border-bottom:1px solid var(--line);">
+          <div style="font-size:11.5px; color:var(--ink3); margin-bottom:2px;">${escapeHtml(c.date)}</div>
+          <div style="font-size:13px; color:var(--ink); line-height:1.5;">${escapeHtml(c.note)}</div>
+        </div>
+      `).join('');
+    }
   }
 
   // ---------- 트립 관리 ----------
@@ -3323,7 +3358,7 @@
   }
 
   // ---------- 설정 드로어 ----------
-  function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); }
+  function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); renderAppInfo(); }
   function closeDrawer(){ el('drawer').classList.remove('show'); el('overlay').classList.remove('show'); }
   el('settingsToggle').addEventListener('click', openDrawer);
   el('drawerClose').addEventListener('click', closeDrawer);
