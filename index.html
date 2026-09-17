@@ -1153,8 +1153,15 @@
       const coords = extractLatLngFromAddr(e.placeAddr);
       if(coords) return `${coords.lat},${coords.lng}`;
     }
-    const name = e.placeName || (e.placeAddr ? placeNameFromAddr(e.placeAddr) : '');
-    return name || null;
+    let name = e.placeName || (e.placeAddr ? placeNameFromAddr(e.placeAddr) : '');
+    if(!name) return null;
+    // 좌표를 못 뽑은 경우(짧은 공유링크 maps.app.goo.gl 등은 URL 안에 좌표가 없어 여기로 떨어짐) 상호명만으로
+    // 경로를 만들면, 맥도날드/스타벅스처럼 전세계에 지점이 아주 많은 체인점은 구글지도가 어느 지점인지
+    // 특정하지 못해 후보 목록을 보여주며 선택을 요구한다. 그 지출에 기록된 도시·국가를 붙여 검색어를
+    // 좁혀서 정확한 지점을 바로 찾도록 돕는다.
+    const locality = [e.city, e.country].filter(Boolean).join(' ');
+    if(locality) name = `${name}, ${locality}`;
+    return name;
   }
   // 그날 방문한 곳들을 방문 순서대로 이어 붙인 구글맵 경로 링크를 만든다. 바로 옆 지출이 같은 장소면
   // 중복 구간으로 넣지 않는다. 경유지로 쓸 수 있는 곳이 2곳 미만이면(경로라고 할 게 없으므로) null.
