@@ -109,6 +109,30 @@
   .rc-marker-dot.now{ width:17px; height:17px; }
   .rc-marker-dot.dim{ opacity:.3; }
   .rc-marker-dot.picked{ transform:scale(1.35); }
+  .rc-subtabs{ display:flex; gap:6px; margin-bottom:16px; }
+  .rc-subtab{ flex:1; background:var(--surface); border:1px solid var(--line2); color:var(--ink2); border-radius:9px; padding:8px 10px; font-size:12px; font-weight:700; }
+  .rc-subtab.active{ background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+  .rc-mini-card{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+  .rc-mini-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .rc-mini-title{ font-weight:800; font-size:13px; }
+  .rc-mini-meta{ font-size:11px; color:var(--ink2); font-weight:700; white-space:nowrap; }
+  .rc-mini-map{ position:relative; width:100%; height:150px; border-radius:12px; overflow:hidden; border:1px solid var(--line2); background:var(--bg); }
+  .rc-mini-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+  .rc-mini-tag{ font-size:10.5px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 9px; border-radius:20px; border:1px solid var(--line2); }
+  .rc-city-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+  .rc-city-card{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:9px; margin-bottom:12px; }
+  .rc-city-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .rc-city-name{ font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px; }
+  .rc-city-range{ font-size:10.5px; color:var(--ink2); font-weight:700; white-space:nowrap; }
+  .rc-daybar{ position:relative; height:5px; border-radius:4px; background:var(--line); }
+  .rc-daybar .seg{ position:absolute; top:0; bottom:0; background:var(--accent); border-radius:4px; }
+  .rc-citymix{ display:flex; height:8px; border-radius:5px; overflow:hidden; }
+  .rc-citymix span{ height:100%; }
+  .rc-city-tags{ display:flex; flex-wrap:wrap; gap:5px; }
+  .rc-city-tag{ font-size:10px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 8px; border-radius:20px; }
+  .rc-city-foot{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .rc-city-foot .n{ font-weight:800; color:var(--ink); font-size:13.5px; white-space:nowrap; }
+  .rc-city-foot .n small{ color:var(--ink2); font-size:10.5px; font-weight:700; margin-left:3px; }
   .rc-chips{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
   .rc-chip{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; border:1px solid var(--line2); border-radius:10px; padding:6px 10px; background:var(--bg); color:var(--ink); cursor:pointer; }
   .rc-chip.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
@@ -969,8 +993,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-18-05';
+  const APP_BUILD = '2026-09-18-06';
   const CHANGELOG = [
+    { date: '2026-09-18', note: '"여행기록" 탭에 하위 탭 2개 추가 — "🌍 미니맵"(여정 전체 + 나라별로 나눠 보는 작은 실제 지도 카드), "🏙 도시별"(도시별 체류기간 바·카테고리 비중·방문 장소 태그를 카드로 압축해서 보기). 지출 추가 시 "도시" 칸을 적어두면 도시별 탭에 그대로 반영됨(안 적은 지출은 국가 단위로 묶임).' },
     { date: '2026-09-18', note: '"여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 교체 — 좌표가 2곳 이상 확보되면 배경이 도식화된 사각형 대신 실제 지형·도로가 보이는 지도로 표시되고, 드래그·확대/축소·핀 클릭 시 장소명 팝업이 가능해짐. 좌표가 부족할 때는 기존 국가 순서 개략도로 자동 대체.' },
     { date: '2026-09-18', note: '"여행기록" 탭에 "🌍 구글 타임라인(GPS) 불러오기" 버튼 추가 — 구글 타임라인(위치기록) 내보내기 JSON 파일을 폰/PC에서 직접 선택하면, 그 여행 기간의 실제 GPS 방문 지점을 지도에 반영. 주소가 안 풀린 지출도 보완되어 지도가 훨씬 정확해짐(파일은 기기에만 저장되고 서버로 전송되지 않음).' },
     { date: '2026-09-18', note: '"여행기록" 지도에 "📍 주소 좌표로 지도 정확하게 만들기" 버튼 추가 — Apps Script(code.gs에 좌표 풀이 기능 추가 필요)로 짧은 구글맵 링크의 실제 좌표를 서버에서 풀어와, 2곳 이상 좌표를 찾으면 국가 순서 개략도 대신 실제 좌표 기반 지도로 자동 전환.' },
@@ -3046,10 +3071,23 @@
   // 그 DOM이 사라지기 전에 반드시 teardownRecapMap()으로 정리해줘야 한다(안 그러면 이벤트 리스너가 누적됨).
   let rcMap = null;
   let rcMarkers = [];
+  let rcMiniMaps = [];
+  let recapView = 'map'; // 'map' | 'mini' | 'cities' — "여행기록" 안의 하위 탭(시안 1·2번을 정식 탭으로 편입)
 
   function teardownRecapMap(){
     if(rcMap){ try{ rcMap.remove(); }catch(err){} rcMap = null; }
     rcMarkers = [];
+    rcMiniMaps.forEach(m => { try{ m.remove(); }catch(err){} });
+    rcMiniMaps = [];
+  }
+
+  function resolveCssColor(c){
+    if(typeof c === 'string' && c.indexOf('var(') === 0){
+      const varName = c.slice(4, -1).trim();
+      const resolved = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+      return resolved || '#C1440E';
+    }
+    return c;
   }
 
   function recapMarkerIcon(color, isNow){
@@ -3089,6 +3127,152 @@
 
     rcMap.fitBounds(latlngs, { padding: [28, 28], maxZoom: 13 });
     setTimeout(() => { if(rcMap) rcMap.invalidateSize(); }, 60);
+  }
+
+  // 2026-09-18 추가: "미니맵"(시안 1번) 하위 탭 — 여정 전체 + 나라별로 나눠 작은 실제 지도를 여러 개 보여준다.
+  // 확대/축소·팝업 없이 한눈에 훑어보는 용도라 attribution만 남기고 줌 버튼은 뺀다.
+  function initRecapMiniMap(containerId, points, color){
+    const mapEl = el(containerId);
+    if(!mapEl || typeof L === 'undefined' || !points.length) return null;
+    const resolvedColor = resolveCssColor(color) || '#C1440E';
+    const map = L.map(mapEl, { scrollWheelZoom:false, zoomControl:false, attributionControl:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OSM</a>'
+    }).addTo(map);
+    const latlngs = points.map(p => [p.lat, p.lng]);
+    if(latlngs.length > 1){
+      L.polyline(latlngs, { color: resolvedColor, weight: 2, opacity: 0.55, dashArray: '3 5' }).addTo(map);
+    }
+    points.forEach((p, i) => {
+      const marker = L.marker([p.lat, p.lng], { icon: recapMarkerIcon(color, i === points.length - 1) }).addTo(map);
+      if(p.name) marker.bindTooltip(escapeHtml(p.name), { direction:'top', offset:[0,-8] });
+    });
+    map.fitBounds(latlngs, { padding: [18, 18], maxZoom: 14 });
+    setTimeout(() => { try{ map.invalidateSize(); }catch(err){} }, 60);
+    rcMiniMaps.push(map);
+    return map;
+  }
+
+  function renderRecapMiniHtml(realPoints, countryOrder, usingRealMap){
+    if(!usingRealMap){
+      return '<div class="rc-empty">좌표가 아직 부족해서 미니맵을 보여줄 수 없어요.<br>"지도" 탭에서 "📍 주소 좌표로 지도 정확하게 만들기"를 먼저 실행해보세요.</div>';
+    }
+    const worldCard = `
+      <div class="rc-mini-card">
+        <div class="rc-mini-head"><span class="rc-mini-title">🌍 여정 전체</span><span class="rc-mini-meta">${realPoints.length}곳</span></div>
+        <div class="rc-mini-map" id="rcMini_world"></div>
+      </div>`;
+    const countryCards = countryOrder.map((c, i) => {
+      const pts = realPoints.filter(p => p.country === c);
+      if(!pts.length) return '';
+      const days = Array.from(new Set(pts.map(p => p.date))).sort();
+      const short = d => d.slice(5).replace('-', '/');
+      const rangeLabel = days.length > 1 ? `${short(days[0])} – ${short(days[days.length-1])}` : short(days[0]);
+      const names = Array.from(new Set(pts.map(p => p.name).filter(Boolean))).slice(0, 6);
+      const tagsHtml = names.length ? `<div class="rc-mini-tags">${names.map(n => `<span class="rc-mini-tag">${escapeHtml(n)}</span>`).join('')}</div>` : '';
+      return `
+      <div class="rc-mini-card">
+        <div class="rc-mini-head"><span class="rc-mini-title">${countryFlag(c)} ${escapeHtml(c)}</span><span class="rc-mini-meta">${rangeLabel} · ${pts.length}곳</span></div>
+        <div class="rc-mini-map" id="rcMini_c${i}"></div>
+        ${tagsHtml}
+      </div>`;
+    }).join('');
+    return worldCard + countryCards;
+  }
+
+  function initRecapMiniMaps(realPoints, countryOrder){
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#C1440E';
+    initRecapMiniMap('rcMini_world', realPoints, accentColor);
+    countryOrder.forEach((c, i) => {
+      const pts = realPoints.filter(p => p.country === c);
+      if(pts.length) initRecapMiniMap(`rcMini_c${i}`, pts, RECAP_DOT_COLORS[i % RECAP_DOT_COLORS.length]);
+    });
+  }
+
+  // 2026-09-18 추가: "도시별"(시안 2번) 하위 탭 — 지출의 city 필드(선택 입력)를 기준으로 묶고,
+  // city를 안 적은 지출은 country명 버킷으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
+  function cityBucketsFromList(sortedList){
+    const buckets = {};
+    const order = [];
+    sortedList.forEach(e => {
+      const key = (e.city && e.city.trim()) || e.country;
+      if(!buckets[key]){ buckets[key] = { key, country: e.country, days: new Set(), items: [], firstDate: e.date }; order.push(key); }
+      const b = buckets[key];
+      b.days.add(e.date);
+      b.items.push(e);
+      if(e.date < b.firstDate) b.firstDate = e.date;
+    });
+    order.sort((a, b) => buckets[a].firstDate.localeCompare(buckets[b].firstDate));
+    return order.map(k => buckets[k]);
+  }
+
+  function renderRecapCitiesHtml(cityBuckets, trip, dayCount){
+    if(!cityBuckets.length){
+      return '<div class="rc-empty">아직 지출 내역이 없어요.</div>';
+    }
+    const tripSpanMs = (trip.startDate && trip.endDate) ? (new Date(trip.endDate+'T00:00:00') - new Date(trip.startDate+'T00:00:00')) : 0;
+    let totalPlaces = 0;
+
+    const cardsHtml = cityBuckets.map(b => {
+      const days = Array.from(b.days).sort();
+      const firstInfo = dayInfo(trip, days[0]);
+      const lastInfo = dayInfo(trip, days[days.length-1]);
+      const rangeLabel = days.length > 1 ? `${firstInfo.label} – ${lastInfo.label}` : `${firstInfo.label} 당일`;
+
+      let daybarHtml = '';
+      if(tripSpanMs > 0){
+        const dayMs = 86400000;
+        const firstOffset = new Date(days[0]+'T00:00:00') - new Date(trip.startDate+'T00:00:00');
+        const lastOffset = new Date(days[days.length-1]+'T00:00:00') - new Date(trip.startDate+'T00:00:00');
+        const fullSpan = tripSpanMs + dayMs;
+        const leftPct = Math.max(0, (firstOffset / fullSpan) * 100);
+        const widthPct = Math.min(100 - leftPct, Math.max(3, ((lastOffset - firstOffset + dayMs) / fullSpan) * 100));
+        daybarHtml = `<div class="rc-daybar"><div class="seg" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%;"></div></div>`;
+      }
+
+      const catTotals = {};
+      b.items.forEach(e => { catTotals[e.category] = (catTotals[e.category]||0) + e.amountKrw; });
+      const catTotal = Object.values(catTotals).reduce((s,v)=>s+v, 0);
+      const mixHtml = catTotal > 0
+        ? `<div class="rc-citymix">${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => `<span style="width:${(amt/catTotal*100).toFixed(1)}%; background:${tagColor(data.categories, cat)};"></span>`).join('')}</div>`
+        : '';
+
+      const placeOrder = [];
+      const seenPlace = new Set();
+      b.items.forEach(e => {
+        if(!e.placeName && !e.placeAddr) return;
+        const name = e.placeName || placeNameFromAddr(e.placeAddr) || e.item;
+        if(!seenPlace.has(name)){ seenPlace.add(name); placeOrder.push(name); }
+      });
+      const placeCount = placeOrder.length;
+      totalPlaces += placeCount;
+      const tagsHtml = placeOrder.length
+        ? `<div class="rc-city-tags">${placeOrder.slice(0,6).map(n => `<span class="rc-city-tag">${escapeHtml(n)}</span>`).join('')}</div>`
+        : '';
+
+      const total = b.items.reduce((s,e)=>s+e.amountKrw, 0);
+
+      return `<div class="rc-city-card">
+        <div class="rc-city-head"><span class="rc-city-name">${countryFlag(b.country)} ${escapeHtml(b.key)}</span><span class="rc-city-range">${rangeLabel}</span></div>
+        ${daybarHtml}
+        ${mixHtml}
+        ${tagsHtml}
+        <div class="rc-city-foot">
+          <span class="n">${placeCount}곳<small>방문</small></span>
+          <span class="n tabular">${won(total)}</span>
+          <span class="n">${days.length}일<small>체류</small></span>
+        </div>
+      </div>`;
+    }).join('');
+
+    const statRow = `
+      <div class="rc-city-stats">
+        <div class="rc-stat"><div class="v tabular">${cityBuckets.length}</div><div class="l">방문 도시</div></div>
+        <div class="rc-stat"><div class="v tabular">${totalPlaces}</div><div class="l">방문 장소</div></div>
+        <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 여행</div></div>
+      </div>`;
+    return statRow + cardsHtml;
   }
 
   function recapSelectCountry(country){
@@ -3365,6 +3549,33 @@
       ? `<a class="toolbtn" href="${escapeHtml(wholeTripRouteUrl)}" target="_blank" rel="noopener" style="width:100%; justify-content:center; margin-bottom:14px;">🧭 전체 여정 동선 한 번에 보기</a>`
       : '';
 
+    // 2026-09-18 추가: "여행기록" 안의 하위 탭 3개 — 지도(기존 실사 지도)·미니맵(시안 1번)·도시별(시안 2번).
+    // 셋 다 위 rc-stats·sectionhead는 공유하고, 그 아래 내용만 recapView에 따라 갈아끼운다.
+    const subtabsHtml = `
+      <div class="rc-subtabs">
+        <button type="button" class="rc-subtab ${recapView==='map'?'active':''}" data-recap-view="map">🗺 지도</button>
+        <button type="button" class="rc-subtab ${recapView==='mini'?'active':''}" data-recap-view="mini">🌍 미니맵</button>
+        <button type="button" class="rc-subtab ${recapView==='cities'?'active':''}" data-recap-view="cities">🏙 도시별</button>
+      </div>`;
+
+    let viewBodyHtml;
+    if(recapView === 'mini'){
+      viewBodyHtml = renderRecapMiniHtml(realPoints, countryOrder, usingRealMap);
+    } else if(recapView === 'cities'){
+      viewBodyHtml = renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
+    } else {
+      viewBodyHtml = `
+        <p class="rc-hint">${hintText}</p>
+        ${timelineUploadBtnHtml}
+        ${resolveBtnHtml}
+        ${wholeTripBtnHtml}
+        <div class="panel" style="margin-bottom:24px;">
+          ${mapFrameHtml}
+          <div class="rc-chips">${chipsHtml}</div>
+          <div class="rc-detail-wrap">${detailHtml}</div>
+        </div>`;
+    }
+
     panel.innerHTML = `
       <div class="rc-stats">
         <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 기간</div></div>
@@ -3373,22 +3584,21 @@
       </div>
 
       <div class="sectionhead"><h3>다녀온 길</h3></div>
-      <p class="rc-hint">${hintText}</p>
-      ${timelineUploadBtnHtml}
-      ${resolveBtnHtml}
-      ${wholeTripBtnHtml}
-      <div class="panel" style="margin-bottom:24px;">
-        ${mapFrameHtml}
-        <div class="rc-chips">${chipsHtml}</div>
-        <div class="rc-detail-wrap">${detailHtml}</div>
-      </div>
+      ${subtabsHtml}
+      <div id="recapViewBody">${viewBodyHtml}</div>
     `;
 
-    if(showLeafletMap) initRecapLeafletMap(realPoints, countryOrder);
-    recapSelectCountry(countryOrder[countryOrder.length-1]);
+    if(recapView === 'mini'){
+      if(usingRealMap) initRecapMiniMaps(realPoints, countryOrder);
+    } else {
+      if(showLeafletMap) initRecapLeafletMap(realPoints, countryOrder);
+      recapSelectCountry(countryOrder[countryOrder.length-1]);
+    }
   }
 
   el('recapTabPanel').addEventListener('click', e => {
+    const subtabBtn = e.target.closest('[data-recap-view]');
+    if(subtabBtn){ recapView = subtabBtn.dataset.recapView; renderRecap(); return; }
     if(e.target.closest('#timelineUploadBtn')){ const fi = el('timelineUploadFile'); if(fi) fi.click(); return; }
     if(e.target.closest('#resolveCoordsBtn')){ resolveAllTripAddrCoords(); return; }
     if(e.target.closest('.toolbtn') || e.target.closest('.miniicon')) return;
