@@ -116,7 +116,7 @@
   .rc-mini-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
   .rc-mini-title{ font-weight:800; font-size:13px; }
   .rc-mini-meta{ font-size:11px; color:var(--ink2); font-weight:700; white-space:nowrap; }
-  .rc-mini-map{ position:relative; width:100%; height:150px; border-radius:12px; overflow:hidden; border:1px solid var(--line2); background:var(--bg); }
+  .rc-mini-map{ position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:1px solid var(--line2); background:var(--bg); }
   .rc-mini-tags{ display:flex; flex-wrap:wrap; gap:6px; }
   .rc-mini-tag{ font-size:10.5px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 9px; border-radius:20px; border:1px solid var(--line2); }
   .rc-city-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
@@ -995,8 +995,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-01';
+  const APP_BUILD = '2026-09-19-02';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '"미니맵" 카드의 지도를 세로로 좁은 직사각형 대신 정사각형으로, 카드 너비만큼 더 크게 표시. 같은 좌표(같은 숙소 등)에 지출이 여러 건 걸려있을 때, 국가·상호명을 나중에 고쳐도 지도 핀에는 예전(가장 먼저 본) 내용이 그대로 남아있던 문제 수정 — 이제 같은 좌표는 항상 가장 최근 지출 내용으로 표시됨.' },
     { date: '2026-09-19', note: '구글 타임라인(GPS) 불러오기가 여행 시작~종료일 앞뒤로 ±2일까지 같이 불러오던 것을 없앰 — 그 여유분 때문에 출국 전/귀국 후 평소(국내) 동선까지 "여행 기록"에 섞여 지도가 엉뚱하게 확대되고 나라 추정도 꼬이던 문제 수정. 기존에 이미 불러온 적이 있다면 "다시 불러오기"로 한 번 더 불러와야 깨끗해짐. "도시별" 탭 카드를 지출 금액 중심에서 방문 장소 중심으로 변경 — 카테고리 비중을 금액 대신 방문 장소 수로 계산하고, 태그로 보여주던 장소 목록을 6개로 자르지 않고 전부 표시, 카드 하단의 지출 총액 표시는 뺌.' },
     { date: '2026-09-18', note: '"여행기록" 탭에 하위 탭 2개 추가 — "🌍 미니맵"(여정 전체 + 나라별로 나눠 보는 작은 실제 지도 카드), "🏙 도시별"(도시별 체류기간 바·카테고리 비중·방문 장소 태그를 카드로 압축해서 보기). 지출 추가 시 "도시" 칸을 적어두면 도시별 탭에 그대로 반영됨(안 적은 지출은 국가 단위로 묶임).' },
     { date: '2026-09-18', note: '"여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 교체 — 좌표가 2곳 이상 확보되면 배경이 도식화된 사각형 대신 실제 지형·도로가 보이는 지도로 표시되고, 드래그·확대/축소·핀 클릭 시 장소명 팝업이 가능해짐. 좌표가 부족할 때는 기존 국가 순서 개략도로 자동 대체.' },
@@ -3414,8 +3415,11 @@
     // 실좌표 우선(순서: ①지출 주소에 직접 담긴 좌표 ②Apps Script로 풀어둔 캐시 ③구글 타임라인 GPS 기록),
     // 2곳 미만이면 국가 등장 순서 개략도로 — recapSelectCountry는 두 경우 모두 핀의 data-country만 보고
     // 동작해서 이 블록만 바뀌어도 선택/상세 패널 로직은 그대로 재사용된다.
+    // 2026-09-19 수정: 같은 좌표(같은 숙소 등)에 지출이 여러 건 걸리면 예전엔 "처음 본 것"으로 고정돼서,
+    // 그 자리의 나중 지출 국가/이름을 고쳐도 핀에는 안 보였다 — 이제는 같은 좌표를 다시 만나면 최신(뒤에
+    // 처리되는) 지출 내용으로 덮어써서 항상 그 좌표의 가장 최근 상태가 지도에 반영된다.
     const realPoints = [];
-    const seenPointKeys = new Set();
+    const pointIndexByKey = new Map();
     sortedList.forEach(e => {
       if(!e.placeAddr) return;
       let coord = extractLatLngFromAddr(e.placeAddr);
@@ -3425,16 +3429,21 @@
       }
       if(!coord) return;
       const key = `${coord.lat.toFixed(4)},${coord.lng.toFixed(4)}`;
-      if(seenPointKeys.has(key)) return;
-      seenPointKeys.add(key);
-      realPoints.push({ lat: coord.lat, lng: coord.lng, country: e.country, date: e.date, name: e.placeName || placeNameFromAddr(e.placeAddr) || e.item });
+      const point = { lat: coord.lat, lng: coord.lng, country: e.country, date: e.date, name: e.placeName || placeNameFromAddr(e.placeAddr) || e.item };
+      if(pointIndexByKey.has(key)){
+        realPoints[pointIndexByKey.get(key)] = point;
+      } else {
+        pointIndexByKey.set(key, realPoints.length);
+        realPoints.push(point);
+      }
     });
+    const seenPointKeys = new Set(pointIndexByKey.keys());
     const tlData = data.timelineByTrip[trip.id];
     if(tlData && tlData.visits){
       tlData.visits.forEach(v => {
         if(v.lat == null || v.lng == null) return;
         const key = `${v.lat.toFixed(4)},${v.lng.toFixed(4)}`;
-        if(seenPointKeys.has(key)) return;
+        if(seenPointKeys.has(key)) return; // 지출쪽에 이미 좌표가 있으면 지출 정보(국가·이름)를 우선한다
         seenPointKeys.add(key);
         realPoints.push({ lat: v.lat, lng: v.lng, country: countryForDate(v.date), date: v.date, name: v.label || placeNameForLatLng(v.lat, v.lng) || '' });
       });
