@@ -119,7 +119,8 @@
   .rc-mini-map{ position:relative; width:100%; aspect-ratio:1/1; border-radius:12px; overflow:hidden; border:1px solid var(--line2); background:var(--bg); }
   .rc-mini-tags{ display:flex; flex-wrap:wrap; gap:6px; }
   .rc-mini-tag{ font-size:10.5px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 9px; border-radius:20px; border:1px solid var(--line2); }
-  .rc-city-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+  .rc-city-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:8px; }
+  .rc-city-stats-breakdown{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11px; color:var(--ink2); font-weight:700; margin:0 2px 18px; }
   .rc-country-group{ margin-bottom:22px; }
   .rc-country-group:last-child{ margin-bottom:0; }
   .rc-country-group-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:0 2px 10px; border-bottom:1px solid var(--line2); margin-bottom:12px; }
@@ -985,8 +986,10 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-03';
+  const APP_BUILD = '2026-09-19-05';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '"도시별" 탭 도시 자동 인식을 버튼 클릭 없이 자동 실행으로 변경 — 탭을 열면 기존에 이미 입력해둔 지출까지 포함해 바로 주소 기반으로 도시를 채움. 상단 요약을 "방문 도시/방문 장소/전체 여행"에서 "방문 국가/방문 도시/방문 장소"로 바꾸고, 그 아래에 국가별 방문 도시 수(예: 🇬🇧 영국 1곳 · 🇪🇸 스페인 2곳)를 추가로 표시.' },
+    { date: '2026-09-19', note: '"도시별" 탭에서 city 칸을 직접 안 적은 지출도 자동으로 도시가 구분되게 개선 — 구글지도 주소의 좌표를 OpenStreetMap 역지오코딩으로 조회해서 도시명을 알아냄. "🏙 주소 N곳 도시 자동 인식하기" 버튼을 누르면 아직 못 찾은 좌표들만 순서대로 조회해 캐시해두고(같은 곳은 다시 안 부름), 이후부터는 city를 안 적어도 그 도시 카드 밑으로 자동 분류됨(끝까지 못 찾은 경우만 "기타"로 남음).' },
     { date: '2026-09-19', note: '"여행기록"(지도/미니맵/도시별)에서 출발지인 한국을 완전히 제외 — 인천공항 등 출국일 GPS 기록이나 "한국"으로 표기된 지출은 지리적 좌표 기준으로 걸러내서(주소를 지워도 GPS 타임라인에 남아있던 문제까지 함께 해결) 더 이상 지도·국가 목록·도시별 목록에 나타나지 않음(지출 합계·전체 여행일수는 원래대로 전체 트립 기준 유지). 결제수단(현금/카드) 구분 기능을 전체 삭제 — "결제수단별 지출 비중" 패널, 지출 추가/수정 화면의 현금·카드 선택, 설정의 "카드 구분 관리"를 모두 제거. "카테고리별 비중"·"국가별 지출 비교" 그래프를 누르면 그 자리에서 상세 내역(날짜·항목·금액)이 펼쳐지고, "지출내역에서 필터로 보기" 버튼으로 바로 그 카테고리/국가만 필터링된 지출내역으로 이동 가능. "도시별" 탭을 국가 → 도시 2단계 구조로 변경 — 국가별로 묶은 뒤 그 아래에 도시 구분자를 두고(도시를 안 적은 지출은 "기타"로) 방문 장소를 나열.' },
     { date: '2026-09-19', note: '"미니맵" 카드의 지도를 세로로 좁은 직사각형 대신 정사각형으로, 카드 너비만큼 더 크게 표시. 같은 좌표(같은 숙소 등)에 지출이 여러 건 걸려있을 때, 국가·상호명을 나중에 고쳐도 지도 핀에는 예전(가장 먼저 본) 내용이 그대로 남아있던 문제 수정 — 이제 같은 좌표는 항상 가장 최근 지출 내용으로 표시됨.' },
     { date: '2026-09-19', note: '구글 타임라인(GPS) 불러오기가 여행 시작~종료일 앞뒤로 ±2일까지 같이 불러오던 것을 없앰 — 그 여유분 때문에 출국 전/귀국 후 평소(국내) 동선까지 "여행 기록"에 섞여 지도가 엉뚱하게 확대되고 나라 추정도 꼬이던 문제 수정. 기존에 이미 불러온 적이 있다면 "다시 불러오기"로 한 번 더 불러와야 깨끗해짐. "도시별" 탭 카드를 지출 금액 중심에서 방문 장소 중심으로 변경 — 카테고리 비중을 금액 대신 방문 장소 수로 계산하고, 태그로 보여주던 장소 목록을 6개로 자르지 않고 전부 표시, 카드 하단의 지출 총액 표시는 뺌.' },
@@ -1118,6 +1121,7 @@
       placeNameCache: {},
       placeNameOverride: {},
       placeAddrCoords: {},
+      placeCityCache: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -1142,6 +1146,11 @@
     // 키는 placeAddr 원문 그대로 — { lat, lng, resolvedUrl, resolvedAt }. 좌표를 못 찾은 경우도
     // lat:null로 저장해 매번 다시 시도하지 않는다.
     if(!d.placeAddrCoords) d.placeAddrCoords = {};
+    // 2026-09-19 추가: 도시를 직접 입력 안 한 지출도 "도시별" 탭에서 자동으로 분류할 수 있도록,
+    // 좌표 기준으로 역지오코딩(Nominatim)한 도시명을 캐시해둔다. 키는 좌표를 소수점 2자리로 반올림한
+    // 값("위도,경도") — 같은 동네(대략 1km 이내) 좌표는 API를 다시 부르지 않고 캐시를 재사용한다.
+    // 값이 null이면 "찾아봤지만 도시명이 없었음"으로 확정 캐시(재시도 안 함), 키 자체가 없으면 "아직 시도 안 함".
+    if(!d.placeCityCache) d.placeCityCache = {};
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -3173,9 +3182,79 @@
     });
   }
 
+  // 2026-09-19 추가: "도시별" 탭에서 city 칸을 직접 안 적어도 자동으로 도시를 구분할 수 있게,
+  // 지출의 구글지도 주소(placeAddr)에서 뽑아낸 좌표를 기준으로 역지오코딩(OpenStreetMap Nominatim)해서
+  // 도시명을 얻어온다. 결과는 data.placeCityCache에 좌표 단위로 캐싱해서 같은 곳을 다시 호출하지 않는다.
+  function cityCacheKey(lat, lng){
+    return `${lat.toFixed(2)},${lng.toFixed(2)}`; // 약 1km 격자 — 같은 동네면 API를 다시 안 불러도 되게
+  }
+  function getExpenseCoord(e){
+    if(!e.placeAddr) return null;
+    const direct = extractLatLngFromAddr(e.placeAddr);
+    if(direct) return direct;
+    const cached = data.placeAddrCoords[e.placeAddr];
+    if(cached && cached.lat != null) return { lat: cached.lat, lng: cached.lng };
+    return null;
+  }
+  // 도시 결정 우선순위: ①직접 입력한 city 칸 ②주소 좌표로 역지오코딩해서 캐시해둔 도시명 ③(둘 다 없으면) null → "기타"로 표시
+  function getCityForExpense(e){
+    if(e.city && e.city.trim()) return e.city.trim();
+    const coord = getExpenseCoord(e);
+    if(!coord) return null;
+    const cached = data.placeCityCache[cityCacheKey(coord.lat, coord.lng)];
+    return cached || null;
+  }
+  async function reverseGeocodeCity(lat, lng){
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=ko`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await res.json();
+      const addr = (json && json.address) || {};
+      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district || addr.state || null;
+      return { ok: true, city };
+    }catch(err){
+      console.warn('reverseGeocodeCity 실패', lat, lng, err);
+      return { ok: false }; // 네트워크 실패는 캐시하지 않고 다음에 다시 시도
+    }
+  }
+  let resolvingCities = false;
+  async function resolveAllTripCities(){
+    if(resolvingCities) return;
+    const trip = currentTrip();
+    const list = tripExpenses(trip.id);
+    const targets = new Map(); // cacheKey -> {lat,lng}
+    list.forEach(e => {
+      if(isKoreaCountryName(e.country)) return;
+      if(e.city && e.city.trim()) return;
+      const coord = getExpenseCoord(e);
+      if(!coord) return;
+      const key = cityCacheKey(coord.lat, coord.lng);
+      if(Object.prototype.hasOwnProperty.call(data.placeCityCache, key)) return; // 이미 시도해서 캐시됨(null 포함)
+      targets.set(key, coord);
+    });
+    if(!targets.size) return;
+
+    resolvingCities = true;
+    renderRecap();
+    let found = 0;
+    for(const [key, coord] of targets){
+      const result = await reverseGeocodeCity(coord.lat, coord.lng);
+      if(result.ok){
+        data.placeCityCache[key] = result.city;
+        if(result.city) found++;
+      }
+      await new Promise(r => setTimeout(r, 1100)); // Nominatim 사용정책: 초당 1건 제한 준수
+    }
+    resolvingCities = false;
+    saveData(data);
+    renderRecap();
+    showToast(`${targets.size}곳 중 ${found}곳의 도시를 새로 찾았어요`);
+  }
+
   // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
-  // 같은 국가 안에서 지출의 city 필드(선택 입력) 기준으로 묶고, city를 안 적은 지출은 그 국가의
-  // "기타" 도시구분자 밑으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
+  // 같은 국가 안에서 지출의 city 필드(직접 입력, 없으면 주소 기반 자동 인식) 기준으로 묶고, 둘 다 없는
+  // 지출은 그 국가의 "기타" 도시구분자 밑으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
   function cityBucketsFromList(sortedList){
     const countryGroups = {};
     const countryOrder = [];
@@ -3183,7 +3262,7 @@
       if(isKoreaCountryName(e.country)) return;
       if(!countryGroups[e.country]){ countryGroups[e.country] = { country: e.country, cityMap: {}, cityOrder: [] }; countryOrder.push(e.country); }
       const cg = countryGroups[e.country];
-      const cityKey = (e.city && e.city.trim()) || '기타';
+      const cityKey = getCityForExpense(e) || '기타';
       if(!cg.cityMap[cityKey]){ cg.cityMap[cityKey] = { key: cityKey, country: e.country, days: new Set(), items: [], firstDate: e.date }; cg.cityOrder.push(cityKey); }
       const b = cg.cityMap[cityKey];
       b.days.add(e.date);
@@ -3274,12 +3353,14 @@
       </div>`;
     }).join('');
 
+    const cityBreakdownHtml = `<div class="rc-city-stats-breakdown">${countryGroups.map(cg => `<span>${countryFlag(cg.country)} ${escapeHtml(cg.country)} ${cg.cities.length}곳</span>`).join('')}</div>`;
     const statRow = `
       <div class="rc-city-stats">
+        <div class="rc-stat"><div class="v tabular">${countryGroups.length}</div><div class="l">방문 국가</div></div>
         <div class="rc-stat"><div class="v tabular">${totalCities}</div><div class="l">방문 도시</div></div>
         <div class="rc-stat"><div class="v tabular">${totalPlaces}</div><div class="l">방문 장소</div></div>
-        <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 여행</div></div>
-      </div>`;
+      </div>
+      ${cityBreakdownHtml}`;
     return statRow + countryBlocksHtml;
   }
 
@@ -3495,6 +3576,22 @@
       if(data.placeAddrCoords[e.placeAddr]) return;
       unresolvedAddrs.add(e.placeAddr);
     });
+
+    // "도시별" 탭에서 city 칸도 안 적었고 아직 역지오코딩도 안 해본 좌표 개수 — 기존에 입력해둔 지출도
+    // 포함해서, 버튼을 따로 누를 필요 없이 "도시별" 탭을 열면 자동으로 채워진다(아래 post-render 부분 참고).
+    const unresolvedCityCoords = new Set();
+    sortedList.forEach(e => {
+      if(isKoreaCountryName(e.country) || (e.city && e.city.trim())) return;
+      const coord = getExpenseCoord(e);
+      if(!coord) return;
+      const key = cityCacheKey(coord.lat, coord.lng);
+      if(Object.prototype.hasOwnProperty.call(data.placeCityCache, key)) return;
+      unresolvedCityCoords.add(key);
+    });
+    const resolveCitiesBtnHtml = resolvingCities
+      ? `<p class="rc-hint">🏙 주소를 기반으로 도시를 자동 인식하는 중이에요...</p>`
+      : '';
+
     const hintText = usingRealMap
       ? `실제 좌표 기반 지도예요${tlData && tlData.visits ? ` (구글 타임라인 GPS ${tlData.visits.length}곳 포함)` : ''}.${showLeafletMap ? ' 지도를 드래그·확대하거나 핀을 눌러보세요.' : ' 핀이나 아래 칩을 눌러보세요.'}`
       : '아직 정확한 좌표가 없어 국가가 바뀐 순서로 보여드려요. 핀이나 아래 칩을 눌러보세요.';
@@ -3581,7 +3678,7 @@
     if(recapView === 'mini'){
       viewBodyHtml = renderRecapMiniHtml(realPoints, countryOrder, usingRealMap);
     } else if(recapView === 'cities'){
-      viewBodyHtml = renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
+      viewBodyHtml = resolveCitiesBtnHtml + renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
     } else {
       viewBodyHtml = `
         <p class="rc-hint">${hintText}</p>
@@ -3612,6 +3709,13 @@
     } else {
       if(showLeafletMap) initRecapLeafletMap(realPoints, countryOrder);
       recapSelectCountry(countryOrder[countryOrder.length-1]);
+    }
+
+    // "도시별" 탭을 보고 있고 아직 자동 인식 안 된 주소가 있으면, 버튼 클릭 없이 자동으로 도시를 찾아온다
+    // (기존에 이미 입력해둔 지출도 포함). setTimeout으로 한 틱 미뤄서 이 renderRecap() 호출 자체가
+    // 다 끝난 뒤에 시작하게 한다(그래야 resolveAllTripCities 안의 renderRecap() 재호출과 안 겹침).
+    if(recapView === 'cities' && unresolvedCityCoords.size && !resolvingCities){
+      setTimeout(() => resolveAllTripCities(), 0);
     }
   }
 
