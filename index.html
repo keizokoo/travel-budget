@@ -120,6 +120,12 @@
   .rc-mini-tags{ display:flex; flex-wrap:wrap; gap:6px; }
   .rc-mini-tag{ font-size:10.5px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 9px; border-radius:20px; border:1px solid var(--line2); }
   .rc-city-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+  .rc-country-group{ margin-bottom:22px; }
+  .rc-country-group:last-child{ margin-bottom:0; }
+  .rc-country-group-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:0 2px 10px; border-bottom:1px solid var(--line2); margin-bottom:12px; }
+  .rc-country-group-name{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:6px; }
+  .rc-country-group-meta{ font-size:11px; color:var(--ink2); font-weight:700; white-space:nowrap; }
+  .rc-country-group-cities{ padding-left:2px; }
   .rc-city-card{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:9px; margin-bottom:12px; }
   .rc-city-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .rc-city-name{ font-weight:800; font-size:14px; display:flex; align-items:center; gap:6px; }
@@ -179,6 +185,25 @@
   .budget-progress-label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink2); margin-bottom:8px; }
 
   .panel-empty{ font-size:12px; color:var(--ink3); padding:14px 0; text-align:center; }
+
+  .legend-row.clickable, .cbar-row.clickable{ cursor:pointer; border-radius:8px; transition:background .12s; }
+  .legend-row.clickable{ padding:3px 6px; margin:0 -6px 6px; }
+  .cbar-row.clickable{ padding:6px 8px; margin:0 -8px 10px; }
+  .legend-row.clickable:hover, .cbar-row.clickable:hover{ background:var(--bg); }
+  .legend-row.clickable.active, .cbar-row.clickable.active{ background:var(--bg); box-shadow:inset 0 0 0 1px var(--line2); }
+  .panel-detail{ margin-top:12px; padding-top:12px; border-top:1px dashed var(--line2); }
+  .panel-detail-head{ display:flex; justify-content:space-between; align-items:baseline; font-size:13px; margin-bottom:8px; }
+  .panel-detail-head span{ color:var(--ink2); font-size:12px; }
+  .panel-detail-list{ max-height:220px; overflow-y:auto; }
+  .panel-detail-row{ display:flex; align-items:center; gap:8px; font-size:12px; padding:5px 0; border-bottom:1px solid var(--line2); }
+  .panel-detail-row:last-child{ border-bottom:none; }
+  .panel-detail-date{ color:var(--ink3); flex-shrink:0; width:40px; }
+  .panel-detail-item{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .panel-detail-amt{ flex-shrink:0; font-weight:600; }
+  .panel-detail-gotolist{
+    width:100%; margin-top:10px; border:1px solid var(--line2); background:var(--bg); color:var(--ink);
+    border-radius:8px; padding:9px; font-size:12.5px; font-weight:700;
+  }
 
   .sectionhead{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
   .sectionhead h3{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:14px; margin:0; }
@@ -297,11 +322,6 @@
     font-size:12.5px; font-weight:700; color:var(--ink2);
     background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
   }
-  .erow .pay-badge{
-    display:inline-flex; align-items:center; gap:4px;
-    font-size:12.5px; font-weight:700; color:var(--ink2);
-    background:var(--bg); border:1px solid var(--line2); border-radius:999px; padding:3px 10px 3px 8px;
-  }
   .erow .map-link{
     display:inline-flex; align-items:center; gap:4px; text-decoration:none;
     font-size:12.5px; font-weight:700; color:var(--good);
@@ -406,15 +426,6 @@
     width:38px; height:36px; flex-shrink:0; font-size:16px; display:flex; align-items:center; justify-content:center; padding:0;
   }
   .receiptbtn.has-photo{ border-color:var(--good); color:var(--good); }
-  .paymethod-row{ display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
-  .paymethod-btn{
-    border:1px solid var(--line2); background:var(--bg); color:var(--ink2); border-radius:8px;
-    padding:8px 12px; font-size:12.5px; font-weight:700; flex:1;
-  }
-  .paymethod-btn.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
-  .paymethod-row select{
-    flex:1 1 100%; border:1px solid var(--line2); border-radius:8px; padding:8px 9px; font-size:12.5px; background:var(--bg); color:var(--ink);
-  }
   @media (max-width:640px){
     .addrow-grid1{ grid-template-columns:1fr 1fr; }
   }
@@ -644,11 +655,6 @@
             <div id="countryPanel"></div>
           </div>
         </div>
-
-        <div class="panel" style="margin-bottom:24px;">
-          <div class="panel-title">결제수단별 지출 비중</div>
-          <div id="paymentPanel"></div>
-        </div>
       </div>
     </div>
 
@@ -741,11 +747,6 @@
             <input type="text" id="newItem" placeholder="지출 항목" autocomplete="off">
             <input type="file" id="newReceiptFile" accept="image/*" style="display:none;">
             <button type="button" class="receiptbtn" id="newReceiptBtn" title="영수증 사진 추가">📷</button>
-          </div>
-          <div class="paymethod-row" id="paymethodToggle">
-            <button type="button" class="paymethod-btn active" data-pay="cash">💵 현금</button>
-            <button type="button" class="paymethod-btn" data-pay="card">💳 카드</button>
-            <select id="newCardType" style="display:none;"></select>
           </div>
           <div class="fxrow" id="fxRow">
             <input type="number" id="newFxRate" placeholder="환율 (1단위 = ?원)" min="0" step="0.01">
@@ -850,16 +851,6 @@
         <button id="addCurrencyBtn">추가</button>
       </div>
       <p class="note" style="margin-top:8px;">KRW는 원화 그대로, 그 외 통화는 지출 추가 시 환율을 입력하면 자동으로 원화 환산됩니다.</p>
-    </div>
-
-    <div class="block">
-      <h4>카드 구분 관리</h4>
-      <div class="chiprow" id="cardTypeChips"></div>
-      <div class="addchip">
-        <input type="text" id="newCardTypeInput" placeholder="새 카드 구분 (예: 법인카드)">
-        <button id="addCardTypeBtn">추가</button>
-      </div>
-      <p class="note" style="margin-top:8px;">지출 추가 시 결제수단을 "카드"로 선택하면 여기서 등록한 카드 구분 중 하나를 고를 수 있습니다.</p>
     </div>
 
     <div class="block">
@@ -990,13 +981,13 @@
   const DEFAULT_CATEGORIES = ["식사","숙소","교통","기타"];
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
-  const DEFAULT_CARD_TYPES = ["MG","원더","비즈"];
 
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-02';
+  const APP_BUILD = '2026-09-19-03';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '"여행기록"(지도/미니맵/도시별)에서 출발지인 한국을 완전히 제외 — 인천공항 등 출국일 GPS 기록이나 "한국"으로 표기된 지출은 지리적 좌표 기준으로 걸러내서(주소를 지워도 GPS 타임라인에 남아있던 문제까지 함께 해결) 더 이상 지도·국가 목록·도시별 목록에 나타나지 않음(지출 합계·전체 여행일수는 원래대로 전체 트립 기준 유지). 결제수단(현금/카드) 구분 기능을 전체 삭제 — "결제수단별 지출 비중" 패널, 지출 추가/수정 화면의 현금·카드 선택, 설정의 "카드 구분 관리"를 모두 제거. "카테고리별 비중"·"국가별 지출 비교" 그래프를 누르면 그 자리에서 상세 내역(날짜·항목·금액)이 펼쳐지고, "지출내역에서 필터로 보기" 버튼으로 바로 그 카테고리/국가만 필터링된 지출내역으로 이동 가능. "도시별" 탭을 국가 → 도시 2단계 구조로 변경 — 국가별로 묶은 뒤 그 아래에 도시 구분자를 두고(도시를 안 적은 지출은 "기타"로) 방문 장소를 나열.' },
     { date: '2026-09-19', note: '"미니맵" 카드의 지도를 세로로 좁은 직사각형 대신 정사각형으로, 카드 너비만큼 더 크게 표시. 같은 좌표(같은 숙소 등)에 지출이 여러 건 걸려있을 때, 국가·상호명을 나중에 고쳐도 지도 핀에는 예전(가장 먼저 본) 내용이 그대로 남아있던 문제 수정 — 이제 같은 좌표는 항상 가장 최근 지출 내용으로 표시됨.' },
     { date: '2026-09-19', note: '구글 타임라인(GPS) 불러오기가 여행 시작~종료일 앞뒤로 ±2일까지 같이 불러오던 것을 없앰 — 그 여유분 때문에 출국 전/귀국 후 평소(국내) 동선까지 "여행 기록"에 섞여 지도가 엉뚱하게 확대되고 나라 추정도 꼬이던 문제 수정. 기존에 이미 불러온 적이 있다면 "다시 불러오기"로 한 번 더 불러와야 깨끗해짐. "도시별" 탭 카드를 지출 금액 중심에서 방문 장소 중심으로 변경 — 카테고리 비중을 금액 대신 방문 장소 수로 계산하고, 태그로 보여주던 장소 목록을 6개로 자르지 않고 전부 표시, 카드 하단의 지출 총액 표시는 뺌.' },
     { date: '2026-09-18', note: '"여행기록" 탭에 하위 탭 2개 추가 — "🌍 미니맵"(여정 전체 + 나라별로 나눠 보는 작은 실제 지도 카드), "🏙 도시별"(도시별 체류기간 바·카테고리 비중·방문 장소 태그를 카드로 압축해서 보기). 지출 추가 시 "도시" 칸을 적어두면 도시별 탭에 그대로 반영됨(안 적은 지출은 국가 단위로 묶임).' },
@@ -1119,7 +1110,6 @@
       categories: DEFAULT_CATEGORIES.slice(),
       countries: DEFAULT_COUNTRIES.slice(),
       currencies: DEFAULT_CURRENCIES.slice(),
-      cardTypes: DEFAULT_CARD_TYPES.slice(),
       trips: [{ id: tripId, name: "영국·스페인 여행", startDate: "", endDate: "" }],
       currentTripId: tripId,
       expenses: [],
@@ -1137,7 +1127,6 @@
     if(!d.categories || !d.categories.length) d.categories = DEFAULT_CATEGORIES.slice();
     if(!d.countries || !d.countries.length) d.countries = DEFAULT_COUNTRIES.slice();
     if(!d.currencies || !d.currencies.length) d.currencies = DEFAULT_CURRENCIES.slice();
-    if(!d.cardTypes || !d.cardTypes.length) d.cardTypes = DEFAULT_CARD_TYPES.slice();
     if(!d.trips || !d.trips.length){
       const tripId = uid();
       d.trips = [{ id: tripId, name: "새 여행", startDate: "", endDate: "" }];
@@ -1406,27 +1395,6 @@
     sel.value = data.currencies.includes(prev) ? prev : 'KRW';
     toggleFxRow();
   }
-  // ---------- 결제수단(현금/카드) ----------
-  function renderCardTypeOptions(){
-    const sel = el('newCardType');
-    const prev = sel.value;
-    sel.innerHTML = data.cardTypes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-    if(data.cardTypes.includes(prev)) sel.value = prev;
-  }
-  function setPaymentMethod(method){
-    const toggle = el('paymethodToggle');
-    toggle.querySelectorAll('.paymethod-btn').forEach(b => b.classList.toggle('active', b.dataset.pay === method));
-    el('newCardType').style.display = (method === 'card') ? '' : 'none';
-  }
-  function getPaymentMethod(){
-    const activeBtn = el('paymethodToggle').querySelector('.paymethod-btn.active');
-    return activeBtn ? activeBtn.dataset.pay : 'cash';
-  }
-  el('paymethodToggle').addEventListener('click', e => {
-    const btn = e.target.closest('[data-pay]');
-    if(!btn) return;
-    setPaymentMethod(btn.dataset.pay);
-  });
   function toggleFxRow(){
     const cur = el('newCurrency').value;
     const isForeign = cur && cur !== 'KRW';
@@ -1535,12 +1503,6 @@
       return `<span class="chip">${escapeHtml(c)}${renameBtn}${inUse ? '' : ` <button data-remove-currency="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
     }).join('');
 
-    const usedCardTypes = new Set(data.expenses.filter(e=>e.paymentMethod==='card').map(e=>e.cardType));
-    el('cardTypeChips').innerHTML = data.cardTypes.map(c => {
-      const inUse = usedCardTypes.has(c);
-      return `<span class="chip">💳 ${escapeHtml(c)}<button data-rename-cardtype="${escapeHtml(c)}" title="이름 수정">✎</button>${inUse ? '' : ` <button data-remove-cardtype="${escapeHtml(c)}" title="삭제">✕</button>`}</span>`;
-    }).join('');
-
     renderFxRatePanel();
   }
   // 카테고리/국가/통화/카드구분 이름 변경 — 목록의 이름만 바꾸는 게 아니라 이미 저장된 지출 내역에서도
@@ -1612,6 +1574,38 @@
     return list;
   }
 
+  // ---------- 그래프 클릭 → 상세 내역 펼치기/필터 이동 ----------
+  let panelDetailOpen = null; // {type:'category'|'country', name:string} | null
+
+  function panelDetailHtml(type, name){
+    const list = tripExpenses(data.currentTripId).filter(e => (type === 'category' ? e.category : e.country) === name);
+    const sorted = list.slice().sort((a,b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const total = sorted.reduce((s,e)=>s+e.amountKrw, 0);
+    const rowsHtml = sorted.map(e => {
+      const dlabel = (e.date||'').slice(5).replace('-','/');
+      return `<div class="panel-detail-row">
+        <span class="panel-detail-date tabular">${escapeHtml(dlabel)}</span>
+        <span class="panel-detail-item">${escapeHtml(e.item||'')}</span>
+        <span class="panel-detail-amt tabular">${won(e.amountKrw)}</span>
+      </div>`;
+    }).join('');
+    const label = type === 'category' ? escapeHtml(name) : `${countryFlag(name)} ${escapeHtml(name)}`;
+    return `<div class="panel-detail">
+      <div class="panel-detail-head"><b>${label}</b><span class="tabular">${won(total)} · ${sorted.length}건</span></div>
+      <div class="panel-detail-list">${rowsHtml || '<div class="panel-empty">내역이 없습니다</div>'}</div>
+      <button type="button" class="panel-detail-gotolist" data-goto-filter="${type}" data-goto-name="${escapeHtml(name)}">🔧 지출내역에서 필터로 보기</button>
+    </div>`;
+  }
+
+  function gotoFilteredExpenseList(type, name){
+    if(type === 'category'){ filterCategories = new Set([name]); filterCountries = new Set(); }
+    else { filterCountries = new Set([name]); filterCategories = new Set(); }
+    renderFilterChips();
+    renderDayGroups();
+    el('advFilterPanel').style.display = '';
+    el('filterbar').scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
   // ---------- 렌더: 카테고리 도넛 ----------
   function renderCategoryPanel(){
     const list = tripExpenses(data.currentTripId);
@@ -1632,13 +1626,15 @@
     const legend = entries.map(e => {
       const color = tagColor(data.categories, e.name);
       const pct = (e.amt/total*100).toFixed(1);
-      return `<div class="legend-row"><span class="legend-dot" style="background:${color};"></span><span class="legend-name">${escapeHtml(e.name)}</span><span class="legend-pct tabular">${pct}%</span></div>`;
+      const active = (panelDetailOpen && panelDetailOpen.type === 'category' && panelDetailOpen.name === e.name) ? ' active' : '';
+      return `<div class="legend-row clickable${active}" data-panel-cat="${escapeHtml(e.name)}"><span class="legend-dot" style="background:${color};"></span><span class="legend-name">${escapeHtml(e.name)}</span><span class="legend-pct tabular">${pct}%</span></div>`;
     }).join('');
+    const detail = (panelDetailOpen && panelDetailOpen.type === 'category' && totals[panelDetailOpen.name] != null) ? panelDetailHtml('category', panelDetailOpen.name) : '';
     panel.innerHTML = `
       <div class="donut-row">
         <div class="donut" style="background:conic-gradient(${stops});"></div>
         <div class="legend">${legend}</div>
-      </div>`;
+      </div>${detail}`;
   }
 
   // ---------- 렌더: 국가 비교 ----------
@@ -1650,41 +1646,18 @@
     const panel = el('countryPanel');
     if(!entries.length){ panel.innerHTML = '<div class="panel-empty">아직 지출 내역이 없습니다</div>'; return; }
     const max = entries[0].amt;
-    panel.innerHTML = entries.map(e => {
+    const bars = entries.map(e => {
       const color = tagColor(data.countries, e.name);
-      return `<div class="cbar-row">
+      const active = (panelDetailOpen && panelDetailOpen.type === 'country' && panelDetailOpen.name === e.name) ? ' active' : '';
+      return `<div class="cbar-row clickable${active}" data-panel-country="${escapeHtml(e.name)}">
         <div class="cbar-head"><b>${countryFlag(e.name)} ${escapeHtml(e.name)}</b><span class="tabular">${won(e.amt)}</span></div>
         <div class="cbar-track"><div class="cbar-fill" style="width:${(e.amt/max*100).toFixed(1)}%; background:${color};"></div></div>
       </div>`;
     }).join('');
+    const detail = (panelDetailOpen && panelDetailOpen.type === 'country' && totals[panelDetailOpen.name] != null) ? panelDetailHtml('country', panelDetailOpen.name) : '';
+    panel.innerHTML = bars + detail;
   }
 
-  // ---------- 렌더: 결제수단별 비중 ----------
-  function renderPaymentPanel(){
-    const list = tripExpenses(data.currentTripId);
-    const panel = el('paymentPanel');
-    if(!list.length){ panel.innerHTML = '<div class="panel-empty">아직 지출 내역이 없습니다</div>'; return; }
-    const totals = {};
-    const order = [];
-    list.forEach(e => {
-      const key = e.paymentMethod === 'card' ? (e.cardType || '카드(구분없음)') : '현금';
-      if(!(key in totals)){ totals[key] = 0; order.push(key); }
-      totals[key] += e.amountKrw;
-    });
-    // 현금 → 카드 구분 등록 순서로 정렬해서 표시(설정 화면의 카드 구분 관리 순서와 일치시킴)
-    const payLabels = ['현금', ...data.cardTypes, '카드(구분없음)'];
-    const entries = payLabels.filter(k => k in totals).map(k => ({ name:k, amt: totals[k] }));
-    const total = entries.reduce((s,e)=>s+e.amt,0) || 1;
-    panel.innerHTML = entries.map(e => {
-      const color = e.name === '현금' ? 'var(--good)' : tagColor(data.cardTypes, e.name);
-      const icon = e.name === '현금' ? '💵' : '💳';
-      const pct = (e.amt/total*100).toFixed(1);
-      return `<div class="cbar-row">
-        <div class="cbar-head"><b>${icon} ${escapeHtml(e.name)}</b><span class="tabular">${won(e.amt)} · ${pct}%</span></div>
-        <div class="cbar-track"><div class="cbar-fill" style="width:${pct}%; background:${color};"></div></div>
-      </div>`;
-    }).join('');
-  }
 
   // ---------- 일자 라벨 ----------
   function dayInfo(trip, dateStr){
@@ -1783,8 +1756,6 @@
     const fxHtml = e.currency !== 'KRW' ? `<span class="fx">${Number(e.amountForeign).toLocaleString('ko-KR')} ${e.currency}</span>` : '';
     const memoHtml = e.memo ? `<div class="memo">📝 ${escapeHtml(e.memo)}</div>` : '';
     const photoHtml = e.receipt ? `<div class="receipt-thumb"><img src="${e.receipt}" data-photo="${e.id}" alt="영수증"></div>` : '';
-    const payHtml = e.paymentMethod === 'card' ? `<span class="pay-badge">💳 카드${e.cardType ? ' · '+escapeHtml(e.cardType) : ''}</span>`
-      : e.paymentMethod === 'cash' ? `<span class="pay-badge">💵 현금</span>` : '';
     // 상호명 표시 우선순위: 직접 입력한 상호명(가장 정확) > 주소/링크에서 자동으로 뽑아낸 이름 > 일반 "지도" 라벨
     const mapPlaceName = e.placeName || placeNameFromAddr(e.placeAddr);
     const mapLinkHtml = e.placeAddr ? `<a class="map-link" href="${escapeHtml(mapUrlFor(e.placeAddr))}" target="_blank" rel="noopener">🗺 ${escapeHtml(mapPlaceName || '지도')}</a>` : '';
@@ -1811,7 +1782,6 @@
         </div>
         <div class="expand">
           <span class="country-badge">${countryFlag(e.country)} ${escapeHtml(e.country)}${e.city?', '+escapeHtml(e.city):''}</span>
-          ${payHtml}
           ${mapLinkHtml}
           ${photoHtml}
           ${memoHtml}
@@ -2023,7 +1993,6 @@
     renderCategoryOptions();
     renderCountryOptions();
     renderCurrencyOptions();
-    renderCardTypeOptions();
     renderChips();
     renderFilterChips();
     renderStorageUsage();
@@ -2056,7 +2025,6 @@
 
     renderCategoryPanel();
     renderCountryPanel();
-    renderPaymentPanel();
     renderPanelsToggle();
     renderDayGroups();
     renderBulkBar();
@@ -2145,6 +2113,25 @@
     if(filterCountries.has(name)) filterCountries.delete(name); else filterCountries.add(name);
     renderFilterChips();
     renderDayGroups();
+  });
+  // 요약 패널(카테고리 도넛/국가 비교 그래프) 클릭 → 상세 금액 펼치기, 펼친 상태에서 다시 누르면 접힘
+  el('categoryPanel').addEventListener('click', e => {
+    const goto = e.target.closest('[data-goto-filter]');
+    if(goto){ gotoFilteredExpenseList(goto.dataset.gotoFilter, goto.dataset.gotoName); return; }
+    const row = e.target.closest('[data-panel-cat]');
+    if(!row) return;
+    const name = row.dataset.panelCat;
+    panelDetailOpen = (panelDetailOpen && panelDetailOpen.type === 'category' && panelDetailOpen.name === name) ? null : { type:'category', name };
+    renderCategoryPanel();
+  });
+  el('countryPanel').addEventListener('click', e => {
+    const goto = e.target.closest('[data-goto-filter]');
+    if(goto){ gotoFilteredExpenseList(goto.dataset.gotoFilter, goto.dataset.gotoName); return; }
+    const row = e.target.closest('[data-panel-country]');
+    if(!row) return;
+    const name = row.dataset.panelCountry;
+    panelDetailOpen = (panelDetailOpen && panelDetailOpen.type === 'country' && panelDetailOpen.name === name) ? null : { type:'country', name };
+    renderCountryPanel();
   });
   el('filterAmountMin').addEventListener('input', e => {
     filterAmountMin = e.target.value === '' ? null : Math.max(0, Number(e.target.value));
@@ -2547,8 +2534,6 @@
     const placeName = el('newPlaceName').value.trim();
     const timeRaw = el('newTime').value.trim();
     const time = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw.padStart(5,'0') : '';
-    const paymentMethod = getPaymentMethod();
-    const cardType = paymentMethod === 'card' ? el('newCardType').value : null;
 
     if(!date){ showToast('날짜를 선택해주세요'); return; }
     if(category === '__addnew__'){ showToast('카테고리를 선택해주세요'); return; }
@@ -2556,7 +2541,6 @@
     if(!item){ showToast('지출 항목을 입력해주세요'); return; }
     if(!amount || amount <= 0){ showToast('금액을 입력해주세요'); return; }
     if(currency !== 'KRW' && (!fxRate || fxRate <= 0)){ showToast('환율을 입력해주세요'); return; }
-    if(paymentMethod === 'card' && !cardType){ showToast('카드 구분을 선택해주세요'); return; }
 
     const amountKrw = computeKrw(currency, amount, fxRate);
     const dup = findPossibleDuplicate(data.currentTripId, date, currency, currency === 'KRW' ? null : amount, amountKrw, null);
@@ -2567,8 +2551,7 @@
     data.expenses.push({
       id: uid(), tripId: data.currentTripId, date, category, country, city,
       currency, amountForeign: currency === 'KRW' ? null : amount,
-      amountKrw, item, memo, placeAddr, placeName, time, receipt: pendingReceiptDataUrl,
-      paymentMethod, cardType
+      amountKrw, item, memo, placeAddr, placeName, time, receipt: pendingReceiptDataUrl
     });
     if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
     saveData(data);
@@ -2579,7 +2562,6 @@
     pendingReceiptDataUrl = null;
     el('newReceiptBtn').title = '영수증 사진 추가'; el('newReceiptBtn').classList.remove('has-photo'); el('newReceiptFile').value = '';
     pendingKstDateTime = null;
-    setPaymentMethod('cash');
     updateFxPreview();
     render();
     closeAddExpenseModal();
@@ -2702,8 +2684,6 @@
     if(!row) return;
     const catOptions = data.categories.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.category?'selected':''}>${escapeHtml(c)}</option>`).join('');
     const countryOptions = data.countries.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.country?'selected':''}>${escapeHtml(c)}</option>`).join('');
-    const payMethod = exp.paymentMethod || 'cash';
-    const cardTypeOptions = data.cardTypes.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.cardType?'selected':''}>${escapeHtml(c)}</option>`).join('');
     const expCurrency = exp.currency || 'KRW';
     const currencyOptions = data.currencies.map(c=>`<option value="${escapeHtml(c)}" ${c===expCurrency?'selected':''}>${escapeHtml(c)}</option>`).join('');
     // 수정모드는 내가 실제로 입력했던 화폐 그대로 보여주고 고친다(항상 원화로 강제 변환해 보여주지 않음) — 리스트 화면은 지금처럼 원화 표시 유지.
@@ -2725,11 +2705,6 @@
       <input type="date" value="${exp.date}" data-f="date">
       <select data-f="category">${catOptions}</select>
       <select data-f="country">${countryOptions}</select>
-      <select data-f="paymentMethod">
-        <option value="cash" ${payMethod==='cash'?'selected':''}>💵 현금</option>
-        <option value="card" ${payMethod==='card'?'selected':''}>💳 카드</option>
-      </select>
-      <select data-f="cardType" style="${payMethod==='card'?'':'display:none;'}">${cardTypeOptions}</select>
       <input type="text" value="${escapeHtml(exp.time||'')}" data-f="time" placeholder="⏱ 시각 HH:MM (선택)">
       <input type="text" value="${escapeHtml(exp.placeName||'')}" data-f="placeName" placeholder="상호명 (선택)">
       <input type="text" value="${escapeHtml(exp.placeAddr||'')}" data-f="placeAddr" placeholder="🗺 구글지도 주소/링크 (선택)">
@@ -2740,9 +2715,6 @@
         <button class="miniicon save-btn" data-save="${id}" title="저장">✔ 저장</button>
         <button class="miniicon cancel-btn" data-cancel="${id}" title="취소">✕ 취소</button>
       </div>`;
-    row.querySelector('[data-f="paymentMethod"]').addEventListener('change', e => {
-      row.querySelector('[data-f="cardType"]').style.display = (e.target.value === 'card') ? '' : 'none';
-    });
     function updateEditFxPreview(){
       const cur = row.querySelector('[data-f="currency"]').value;
       const amt = Number(row.querySelector('[data-f="amount"]').value) || 0;
@@ -2834,8 +2806,6 @@
       const placeName = row.querySelector('[data-f="placeName"]').value.trim();
       const timeRaw = row.querySelector('[data-f="time"]').value.trim();
       const time = /^\d{1,2}:\d{2}$/.test(timeRaw) ? timeRaw.padStart(5,'0') : '';
-      const paymentMethod = row.querySelector('[data-f="paymentMethod"]').value;
-      const cardType = paymentMethod === 'card' ? row.querySelector('[data-f="cardType"]').value : null;
       if(!date || !item || !amount || amount<=0){ showToast('입력값을 확인해주세요'); return; }
       if(currency !== 'KRW' && (!fxRate || fxRate<=0)){ showToast('환율을 입력해주세요'); return; }
       const amountKrw = computeKrw(currency, amount, fxRate);
@@ -2847,7 +2817,6 @@
       exp.placeAddr = placeAddr;
       exp.placeName = placeName;
       exp.time = time;
-      exp.paymentMethod = paymentMethod; exp.cardType = cardType;
       exp.receipt = editReceiptDataUrl;
       if(currency !== 'KRW'){ data.lastFxRate[currency] = fxRate; }
       saveData(data);
@@ -3070,6 +3039,16 @@
 
   const RECAP_DOT_COLORS = ['var(--accent)', 'var(--good)', 'var(--warn)', '#8B6FDA', '#2E86AB'];
 
+  // 여행기록(지도/미니맵/도시별)에서는 출발지인 한국을 제외한다 — 인천공항 등 출국 당일 GPS 기록이나
+  // "한국"으로 표기된 지출이 여행 동선처럼 보이는 걸 막기 위함. 지출합계(totalSpent)·전체기간(dayCount) 같은
+  // 회계용 숫자는 그대로 전체 트립 기준을 유지하고, 지도/국가목록/도시별 목록에서만 걸러낸다.
+  function isKoreaCountryName(name){
+    return name === '한국' || name === '대한민국';
+  }
+  function isKoreaLatLng(lat, lng){
+    return lat >= 33.0 && lat <= 38.7 && lng >= 124.5 && lng <= 131.9;
+  }
+
   // 2026-09-18 추가: "여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 렌더링.
   // renderRecap()이 호출될 때마다 panel.innerHTML을 통째로 새로 그리므로, 이전 지도 인스턴스는
   // 그 DOM이 사라지기 전에 반드시 teardownRecapMap()으로 정리해줘야 한다(안 그러면 이벤트 리스너가 누적됨).
@@ -3194,31 +3173,42 @@
     });
   }
 
-  // 2026-09-18 추가: "도시별"(시안 2번) 하위 탭 — 지출의 city 필드(선택 입력)를 기준으로 묶고,
-  // city를 안 적은 지출은 country명 버킷으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
+  // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
+  // 같은 국가 안에서 지출의 city 필드(선택 입력) 기준으로 묶고, city를 안 적은 지출은 그 국가의
+  // "기타" 도시구분자 밑으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
   function cityBucketsFromList(sortedList){
-    const buckets = {};
-    const order = [];
+    const countryGroups = {};
+    const countryOrder = [];
     sortedList.forEach(e => {
-      const key = (e.city && e.city.trim()) || e.country;
-      if(!buckets[key]){ buckets[key] = { key, country: e.country, days: new Set(), items: [], firstDate: e.date }; order.push(key); }
-      const b = buckets[key];
+      if(isKoreaCountryName(e.country)) return;
+      if(!countryGroups[e.country]){ countryGroups[e.country] = { country: e.country, cityMap: {}, cityOrder: [] }; countryOrder.push(e.country); }
+      const cg = countryGroups[e.country];
+      const cityKey = (e.city && e.city.trim()) || '기타';
+      if(!cg.cityMap[cityKey]){ cg.cityMap[cityKey] = { key: cityKey, country: e.country, days: new Set(), items: [], firstDate: e.date }; cg.cityOrder.push(cityKey); }
+      const b = cg.cityMap[cityKey];
       b.days.add(e.date);
       b.items.push(e);
       if(e.date < b.firstDate) b.firstDate = e.date;
     });
-    order.sort((a, b) => buckets[a].firstDate.localeCompare(buckets[b].firstDate));
-    return order.map(k => buckets[k]);
+    return countryOrder.map(country => {
+      const cg = countryGroups[country];
+      const cities = cg.cityOrder
+        .slice()
+        .sort((a,b) => cg.cityMap[a].firstDate.localeCompare(cg.cityMap[b].firstDate))
+        .map(k => cg.cityMap[k]);
+      return { country, cities };
+    });
   }
 
-  function renderRecapCitiesHtml(cityBuckets, trip, dayCount){
-    if(!cityBuckets.length){
+  function renderRecapCitiesHtml(countryGroups, trip, dayCount){
+    if(!countryGroups.length){
       return '<div class="rc-empty">아직 지출 내역이 없어요.</div>';
     }
     const tripSpanMs = (trip.startDate && trip.endDate) ? (new Date(trip.endDate+'T00:00:00') - new Date(trip.startDate+'T00:00:00')) : 0;
     let totalPlaces = 0;
+    let totalCities = 0;
 
-    const cardsHtml = cityBuckets.map(b => {
+    function cityCardHtml(b){
       const days = Array.from(b.days).sort();
       const firstInfo = dayInfo(trip, days[0]);
       const lastInfo = dayInfo(trip, days[days.length-1]);
@@ -3261,7 +3251,7 @@
         : `<div class="rc-place-row rc-place-empty" style="padding:2px 0;">등록된 장소가 없어요</div>`;
 
       return `<div class="rc-city-card">
-        <div class="rc-city-head"><span class="rc-city-name">${countryFlag(b.country)} ${escapeHtml(b.key)}</span><span class="rc-city-range">${rangeLabel}</span></div>
+        <div class="rc-city-head"><span class="rc-city-name">🏙 ${escapeHtml(b.key)}</span><span class="rc-city-range">${rangeLabel}</span></div>
         ${daybarHtml}
         ${mixHtml}
         ${tagsHtml}
@@ -3270,15 +3260,27 @@
           <span class="n">${days.length}일<small>체류</small></span>
         </div>
       </div>`;
+    }
+
+    const countryBlocksHtml = countryGroups.map(cg => {
+      totalCities += cg.cities.length;
+      const cardsHtml = cg.cities.map(cityCardHtml).join('');
+      return `<div class="rc-country-group">
+        <div class="rc-country-group-head">
+          <span class="rc-country-group-name">${countryFlag(cg.country)} ${escapeHtml(cg.country)}</span>
+          <span class="rc-country-group-meta">${cg.cities.length}개 도시</span>
+        </div>
+        <div class="rc-country-group-cities">${cardsHtml}</div>
+      </div>`;
     }).join('');
 
     const statRow = `
       <div class="rc-city-stats">
-        <div class="rc-stat"><div class="v tabular">${cityBuckets.length}</div><div class="l">방문 도시</div></div>
+        <div class="rc-stat"><div class="v tabular">${totalCities}</div><div class="l">방문 도시</div></div>
         <div class="rc-stat"><div class="v tabular">${totalPlaces}</div><div class="l">방문 장소</div></div>
         <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 여행</div></div>
       </div>`;
-    return statRow + cardsHtml;
+    return statRow + countryBlocksHtml;
   }
 
   function recapSelectCountry(country){
@@ -3377,10 +3379,11 @@
       dayCount = Math.round((new Date(trip.endDate+'T00:00:00') - new Date(trip.startDate+'T00:00:00')) / 86400000) + 1;
     }
 
-    // 국가가 처음 등장한 순서대로 나열 + 국가별 방문일수·지출합계·방문일 목록
+    // 국가가 처음 등장한 순서대로 나열 + 국가별 방문일수·지출합계·방문일 목록 (출발지 한국은 제외)
     const countryAgg = {};
     const countryOrder = [];
     sortedList.forEach(e => {
+      if(isKoreaCountryName(e.country)) return;
       if(!countryAgg[e.country]){ countryAgg[e.country] = { days: new Set(), total: 0, items: [] }; countryOrder.push(e.country); }
       countryAgg[e.country].days.add(e.date);
       countryAgg[e.country].total += e.amountKrw;
@@ -3428,6 +3431,7 @@
         if(cached && cached.lat != null) coord = { lat: cached.lat, lng: cached.lng };
       }
       if(!coord) return;
+      if(isKoreaLatLng(coord.lat, coord.lng) || isKoreaCountryName(e.country)) return;
       const key = `${coord.lat.toFixed(4)},${coord.lng.toFixed(4)}`;
       const point = { lat: coord.lat, lng: coord.lng, country: e.country, date: e.date, name: e.placeName || placeNameFromAddr(e.placeAddr) || e.item };
       if(pointIndexByKey.has(key)){
@@ -3442,6 +3446,7 @@
     if(tlData && tlData.visits){
       tlData.visits.forEach(v => {
         if(v.lat == null || v.lng == null) return;
+        if(isKoreaLatLng(v.lat, v.lng)) return;
         const key = `${v.lat.toFixed(4)},${v.lng.toFixed(4)}`;
         if(seenPointKeys.has(key)) return; // 지출쪽에 이미 좌표가 있으면 지출 정보(국가·이름)를 우선한다
         seenPointKeys.add(key);
@@ -3986,29 +3991,6 @@
     data.currencies = data.currencies.filter(c=>c!==name);
     saveData(data); render();
   });
-  el('addCardTypeBtn').addEventListener('click', () => {
-    const input = el('newCardTypeInput');
-    const name = input.value.trim();
-    if(!name) return;
-    if(data.cardTypes.includes(name)){ showToast('이미 있는 카드 구분입니다'); return; }
-    data.cardTypes.push(name);
-    saveData(data); input.value=''; render();
-    showToast(`'${name}' 카드 구분이 추가되었습니다`);
-  });
-  el('cardTypeChips').addEventListener('click', e => {
-    const renameName = e.target.dataset.renameCardtype;
-    if(renameName){
-      const newName = promptRename(renameName, '카드 구분');
-      if(newName) renameListValue(data.cardTypes, renameName, newName, (oldN, newN) => {
-        data.expenses.forEach(exp => { if(exp.cardType === oldN) exp.cardType = newN; });
-      });
-      return;
-    }
-    const name = e.target.dataset.removeCardtype;
-    if(!name) return;
-    data.cardTypes = data.cardTypes.filter(c=>c!==name);
-    saveData(data); render();
-  });
   el('fxRatePanel').addEventListener('click', e => {
     const cur = e.target.dataset.saveFxrate;
     if(!cur) return;
@@ -4030,7 +4012,7 @@
       e.target.closest('.fxrate-row').querySelector('[data-save-fxrate]').click();
     }
   });
-  [['newCategoryInput','addCategoryBtn'], ['newCountryInput','addCountryBtn'], ['newCurrencyInput','addCurrencyBtn'], ['newCardTypeInput','addCardTypeBtn']].forEach(([inputId, btnId]) => {
+  [['newCategoryInput','addCategoryBtn'], ['newCountryInput','addCountryBtn'], ['newCurrencyInput','addCurrencyBtn']].forEach(([inputId, btnId]) => {
     el(inputId).addEventListener('keydown', ev => { if(ev.key === 'Enter'){ ev.preventDefault(); el(btnId).click(); } });
   });
 
@@ -4268,10 +4250,9 @@
 
   // ---------- CSV 내보내기 ----------
   function doCsvExport(){
-    const rows = [['날짜','시각','카테고리','국가','도시','항목','메모','상호명','장소(구글지도)','통화','외화금액','원화금액','결제수단','카드구분']];
+    const rows = [['날짜','시각','카테고리','국가','도시','항목','메모','상호명','장소(구글지도)','통화','외화금액','원화금액']];
     tripExpenses(data.currentTripId).forEach(e => {
-      const payLabel = e.paymentMethod === 'card' ? '카드' : e.paymentMethod === 'cash' ? '현금' : '';
-      rows.push([e.date, e.time||'', e.category, e.country, e.city||'', e.item, e.memo||'', e.placeName||'', e.placeAddr||'', e.currency, e.amountForeign||'', e.amountKrw, payLabel, e.cardType||'']);
+      rows.push([e.date, e.time||'', e.category, e.country, e.city||'', e.item, e.memo||'', e.placeName||'', e.placeAddr||'', e.currency, e.amountForeign||'', e.amountKrw]);
     });
     const csv = rows.map(r => r.map(v => {
       const s = String(v);
