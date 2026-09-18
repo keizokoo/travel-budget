@@ -128,6 +128,8 @@
   .rc-daybar .seg{ position:absolute; top:0; bottom:0; background:var(--accent); border-radius:4px; }
   .rc-citymix{ display:flex; height:8px; border-radius:5px; overflow:hidden; }
   .rc-citymix span{ height:100%; }
+  .rc-city-catcaption{ display:flex; flex-wrap:wrap; gap:8px; font-size:10px; color:var(--ink2); font-weight:700; }
+  .rc-city-catcaption i{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:3px; vertical-align:middle; }
   .rc-city-tags{ display:flex; flex-wrap:wrap; gap:5px; }
   .rc-city-tag{ font-size:10px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 8px; border-radius:20px; }
   .rc-city-foot{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
@@ -993,8 +995,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-18-06';
+  const APP_BUILD = '2026-09-19-01';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '구글 타임라인(GPS) 불러오기가 여행 시작~종료일 앞뒤로 ±2일까지 같이 불러오던 것을 없앰 — 그 여유분 때문에 출국 전/귀국 후 평소(국내) 동선까지 "여행 기록"에 섞여 지도가 엉뚱하게 확대되고 나라 추정도 꼬이던 문제 수정. 기존에 이미 불러온 적이 있다면 "다시 불러오기"로 한 번 더 불러와야 깨끗해짐. "도시별" 탭 카드를 지출 금액 중심에서 방문 장소 중심으로 변경 — 카테고리 비중을 금액 대신 방문 장소 수로 계산하고, 태그로 보여주던 장소 목록을 6개로 자르지 않고 전부 표시, 카드 하단의 지출 총액 표시는 뺌.' },
     { date: '2026-09-18', note: '"여행기록" 탭에 하위 탭 2개 추가 — "🌍 미니맵"(여정 전체 + 나라별로 나눠 보는 작은 실제 지도 카드), "🏙 도시별"(도시별 체류기간 바·카테고리 비중·방문 장소 태그를 카드로 압축해서 보기). 지출 추가 시 "도시" 칸을 적어두면 도시별 탭에 그대로 반영됨(안 적은 지출은 국가 단위로 묶임).' },
     { date: '2026-09-18', note: '"여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 교체 — 좌표가 2곳 이상 확보되면 배경이 도식화된 사각형 대신 실제 지형·도로가 보이는 지도로 표시되고, 드래그·확대/축소·핀 클릭 시 장소명 팝업이 가능해짐. 좌표가 부족할 때는 기존 국가 순서 개략도로 자동 대체.' },
     { date: '2026-09-18', note: '"여행기록" 탭에 "🌍 구글 타임라인(GPS) 불러오기" 버튼 추가 — 구글 타임라인(위치기록) 내보내기 JSON 파일을 폰/PC에서 직접 선택하면, 그 여행 기간의 실제 GPS 방문 지점을 지도에 반영. 주소가 안 풀린 지출도 보완되어 지도가 훨씬 정확해짐(파일은 기기에만 저장되고 서버로 전송되지 않음).' },
@@ -3231,27 +3234,30 @@
         daybarHtml = `<div class="rc-daybar"><div class="seg" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%;"></div></div>`;
       }
 
-      const catTotals = {};
-      b.items.forEach(e => { catTotals[e.category] = (catTotals[e.category]||0) + e.amountKrw; });
-      const catTotal = Object.values(catTotals).reduce((s,v)=>s+v, 0);
-      const mixHtml = catTotal > 0
-        ? `<div class="rc-citymix">${Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => `<span style="width:${(amt/catTotal*100).toFixed(1)}%; background:${tagColor(data.categories, cat)};"></span>`).join('')}</div>`
-        : '';
-
+      // 2026-09-19 수정: "얼마 썼는지"가 아니라 "어딜 갔는지"가 주인공이 되도록 — 카테고리 비중은
+      // 금액이 아니라 "방문 장소 수" 기준으로 바꾸고, 장소 태그는 다 잘리지 않게 전부 보여주고,
+      // 카드 하단의 지출 총액은 뺐다(금액은 지출내역 탭에 이미 있음).
       const placeOrder = [];
       const seenPlace = new Set();
+      const placeCat = {};
       b.items.forEach(e => {
         if(!e.placeName && !e.placeAddr) return;
         const name = e.placeName || placeNameFromAddr(e.placeAddr) || e.item;
-        if(!seenPlace.has(name)){ seenPlace.add(name); placeOrder.push(name); }
+        if(!seenPlace.has(name)){ seenPlace.add(name); placeOrder.push(name); placeCat[name] = e.category; }
       });
       const placeCount = placeOrder.length;
       totalPlaces += placeCount;
-      const tagsHtml = placeOrder.length
-        ? `<div class="rc-city-tags">${placeOrder.slice(0,6).map(n => `<span class="rc-city-tag">${escapeHtml(n)}</span>`).join('')}</div>`
-        : '';
 
-      const total = b.items.reduce((s,e)=>s+e.amountKrw, 0);
+      const catCounts = {};
+      placeOrder.forEach(n => { const cat = placeCat[n]; catCounts[cat] = (catCounts[cat]||0) + 1; });
+      const catEntries = Object.entries(catCounts).sort((a,b)=>b[1]-a[1]);
+      const mixHtml = placeCount > 0
+        ? `<div class="rc-citymix">${catEntries.map(([cat,cnt]) => `<span style="width:${(cnt/placeCount*100).toFixed(1)}%; background:${tagColor(data.categories, cat)};"></span>`).join('')}</div>
+           <div class="rc-city-catcaption">${catEntries.map(([cat,cnt]) => `<span><i style="background:${tagColor(data.categories, cat)};"></i>${escapeHtml(cat)} ${cnt}</span>`).join('')}</div>`
+        : '';
+      const tagsHtml = placeOrder.length
+        ? `<div class="rc-city-tags">${placeOrder.map(n => `<span class="rc-city-tag">${escapeHtml(n)}</span>`).join('')}</div>`
+        : `<div class="rc-place-row rc-place-empty" style="padding:2px 0;">등록된 장소가 없어요</div>`;
 
       return `<div class="rc-city-card">
         <div class="rc-city-head"><span class="rc-city-name">${countryFlag(b.country)} ${escapeHtml(b.key)}</span><span class="rc-city-range">${rangeLabel}</span></div>
@@ -3260,7 +3266,6 @@
         ${tagsHtml}
         <div class="rc-city-foot">
           <span class="n">${placeCount}곳<small>방문</small></span>
-          <span class="n tabular">${won(total)}</span>
           <span class="n">${days.length}일<small>체류</small></span>
         </div>
       </div>`;
@@ -3619,6 +3624,10 @@
   // localStorage가 감당할 수 있다. 좌표의 시간 문자열 끝에 붙는 +00:00 같은 오프셋 표기는 내보내기 과정의
   // 알려진 버그로 실제와 다를 수 있어(예: 영국 방문인데 +02:00으로 찍히는 등) 신뢰하지 않고, 날짜·시각은
   // 문자열 앞부분(오프셋 무시)을 그대로 현지 시각으로 취급한다.
+  // 2026-09-19 수정: 여행 시작/종료일 앞뒤로 ±2일을 더 봐주던 패딩을 없앴다 — 그 패딩 때문에 출국 며칠
+  // 전/입국 며칠 후의 "평소(국내) 동선"까지 여행 기록으로 딸려 들어와서, 지도가 그 평소 동선(수원·대구 등)에
+  // 맞춰 확대되고 country 추정(countryForDate)도 엉뚱하게 붙는 문제가 있었다. 여행 기간(시작일~종료일)에
+  // 정확히 속하는 기록만 남긴다.
   function handleTimelineUpload(file){
     if(!file) return;
     const trip = currentTrip();
@@ -3631,14 +3640,12 @@
         const segs = raw.semanticSegments;
         if(!Array.isArray(segs)) throw new Error('semanticSegments 없음');
 
-        const pad = n => String(n).padStart(2,'0');
-        function addDaysStr(dateStr, days){
-          const d = new Date(dateStr+'T00:00:00');
-          d.setDate(d.getDate()+days);
-          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        if(!trip.startDate || !trip.endDate){
+          showToast('먼저 설정에서 이 여행의 시작일·종료일을 입력해주세요 (여행 기간 밖 기록을 걸러내는 데 필요해요)');
+          return;
         }
-        const padStart = trip.startDate ? addDaysStr(trip.startDate, -2) : null;
-        const padEnd = trip.endDate ? addDaysStr(trip.endDate, 2) : null;
+        const rangeStart = trip.startDate;
+        const rangeEnd = trip.endDate;
 
         const visits = [];
         segs.forEach(s => {
@@ -3650,8 +3657,7 @@
           if(!m) return;
           const dateStr = (s.startTime||'').slice(0,10);
           if(!dateStr) return;
-          if(padStart && dateStr < padStart) return;
-          if(padEnd && dateStr > padEnd) return;
+          if(dateStr < rangeStart || dateStr > rangeEnd) return;
           visits.push({
             date: dateStr,
             startTime: (s.startTime||'').slice(11,16),
@@ -3666,7 +3672,7 @@
         visits.sort((a,b) => (a.date+a.startTime).localeCompare(b.date+b.startTime));
 
         if(!visits.length){
-          showToast('이 여행 기간(±2일)에 해당하는 위치 기록을 찾지 못했어요');
+          showToast('이 여행 기간(' + rangeStart + ' ~ ' + rangeEnd + ')에 해당하는 위치 기록을 찾지 못했어요');
           return;
         }
         data.timelineByTrip[trip.id] = { fileName: file.name, uploadedAt: new Date().toISOString(), visits };
