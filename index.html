@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --bg:#F6F7F6; --surface:#FFFFFF; --ink:#1B2430; --ink2:#5C6570; --ink3:#98A0A8;
@@ -100,6 +102,13 @@
   .rc-pin.picked{ transform:scale(1.3); }
   .rc-pin-label{ position:absolute; font-size:10.5px; color:var(--ink2); white-space:nowrap; transition:opacity .2s ease; }
   .rc-pin-label.dim{ opacity:.25; }
+  .rc-leaflet-map{ position:relative; height:260px; border-radius:12px; overflow:hidden; margin-bottom:14px; border:1px solid var(--line2); background:var(--bg); }
+  .rc-leaflet-map .leaflet-popup-content-wrapper{ border-radius:10px; font-family:'Manrope','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; }
+  .rc-leaflet-map .leaflet-popup-content{ font-size:12.5px; margin:9px 12px; }
+  .rc-marker-dot{ width:14px; height:14px; border-radius:50%; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.4); transition:transform .15s ease, opacity .15s ease; }
+  .rc-marker-dot.now{ width:17px; height:17px; }
+  .rc-marker-dot.dim{ opacity:.3; }
+  .rc-marker-dot.picked{ transform:scale(1.35); }
   .rc-chips{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
   .rc-chip{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; border:1px solid var(--line2); border-radius:10px; padding:6px 10px; background:var(--bg); color:var(--ink); cursor:pointer; }
   .rc-chip.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
@@ -960,8 +969,10 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-18-03';
+  const APP_BUILD = '2026-09-18-05';
   const CHANGELOG = [
+    { date: '2026-09-18', note: '"여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 교체 — 좌표가 2곳 이상 확보되면 배경이 도식화된 사각형 대신 실제 지형·도로가 보이는 지도로 표시되고, 드래그·확대/축소·핀 클릭 시 장소명 팝업이 가능해짐. 좌표가 부족할 때는 기존 국가 순서 개략도로 자동 대체.' },
+    { date: '2026-09-18', note: '"여행기록" 탭에 "🌍 구글 타임라인(GPS) 불러오기" 버튼 추가 — 구글 타임라인(위치기록) 내보내기 JSON 파일을 폰/PC에서 직접 선택하면, 그 여행 기간의 실제 GPS 방문 지점을 지도에 반영. 주소가 안 풀린 지출도 보완되어 지도가 훨씬 정확해짐(파일은 기기에만 저장되고 서버로 전송되지 않음).' },
     { date: '2026-09-18', note: '"여행기록" 지도에 "📍 주소 좌표로 지도 정확하게 만들기" 버튼 추가 — Apps Script(code.gs에 좌표 풀이 기능 추가 필요)로 짧은 구글맵 링크의 실제 좌표를 서버에서 풀어와, 2곳 이상 좌표를 찾으면 국가 순서 개략도 대신 실제 좌표 기반 지도로 자동 전환.' },
     { date: '2026-09-18', note: '"여행기록" 탭을 지도 중심으로 재구성 — Day별 타임라인(지출내역 탭과 중복) 대신, 국가 핀/칩을 누르면 그 나라 체류기간·최다 카테고리·방문 장소별 합계·통합 동선 링크가 바로 펼쳐짐. "전체 여정 동선 한 번에 보기" 버튼 추가.' },
     { date: '2026-09-18', note: '상단에 "🗺 여행기록" 탭 추가 — 국가가 바뀐 순서로 보는 경로, Day별 타임라인(메모·대표 장소·지출·동선 보기 링크)을 한 화면에서 확인. Day를 누르면 위 경로에서 그 나라가 강조됨.' },
@@ -3030,6 +3041,56 @@
 
   const RECAP_DOT_COLORS = ['var(--accent)', 'var(--good)', 'var(--warn)', '#8B6FDA', '#2E86AB'];
 
+  // 2026-09-18 추가: "여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 렌더링.
+  // renderRecap()이 호출될 때마다 panel.innerHTML을 통째로 새로 그리므로, 이전 지도 인스턴스는
+  // 그 DOM이 사라지기 전에 반드시 teardownRecapMap()으로 정리해줘야 한다(안 그러면 이벤트 리스너가 누적됨).
+  let rcMap = null;
+  let rcMarkers = [];
+
+  function teardownRecapMap(){
+    if(rcMap){ try{ rcMap.remove(); }catch(err){} rcMap = null; }
+    rcMarkers = [];
+  }
+
+  function recapMarkerIcon(color, isNow){
+    const size = isNow ? 17 : 14;
+    return L.divIcon({
+      className: '',
+      html: `<div class="rc-marker-dot${isNow ? ' now' : ''}" style="background:${color};"></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2]
+    });
+  }
+
+  function initRecapLeafletMap(points, countryOrder){
+    const mapEl = el('rcLeafletMap');
+    if(!mapEl || typeof L === 'undefined' || !points.length) return;
+    const countryColor = {};
+    countryOrder.forEach((c, i) => { countryColor[c] = RECAP_DOT_COLORS[i % RECAP_DOT_COLORS.length]; });
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#C1440E';
+
+    rcMap = L.map(mapEl, { scrollWheelZoom:false, attributionControl:true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+    }).addTo(rcMap);
+
+    const latlngs = points.map(p => [p.lat, p.lng]);
+    L.polyline(latlngs, { color: accentColor, weight: 2, opacity: 0.6, dashArray: '4 6' }).addTo(rcMap);
+
+    points.forEach((p, i) => {
+      const isNow = i === points.length - 1;
+      const marker = L.marker([p.lat, p.lng], { icon: recapMarkerIcon(countryColor[p.country] || accentColor, isNow) }).addTo(rcMap);
+      marker.bindPopup(`<b>${escapeHtml(p.name || p.country)}</b><br>${countryFlag(p.country)} ${escapeHtml(p.country)} · ${escapeHtml(p.date)}`);
+      marker.on('click', () => recapSelectCountry(p.country));
+      rcMarkers.push({ marker, country: p.country });
+    });
+
+    rcMap.fitBounds(latlngs, { padding: [28, 28], maxZoom: 13 });
+    setTimeout(() => { if(rcMap) rcMap.invalidateSize(); }, 60);
+  }
+
   function recapSelectCountry(country){
     const panel = el('recapTabPanel');
     panel.querySelectorAll('.rc-pin').forEach(p => {
@@ -3039,6 +3100,14 @@
     panel.querySelectorAll('.rc-pin-label').forEach(l => l.classList.toggle('dim', l.dataset.country !== country));
     panel.querySelectorAll('.rc-chip').forEach(c => c.classList.toggle('active', c.dataset.country === country));
     panel.querySelectorAll('.rc-detail').forEach(d => { d.style.display = d.dataset.country === country ? '' : 'none'; });
+    rcMarkers.forEach(({ marker, country: mc }) => {
+      const iconEl = marker.getElement && marker.getElement();
+      const dot = iconEl && iconEl.querySelector('.rc-marker-dot');
+      if(dot){
+        dot.classList.toggle('dim', mc !== country);
+        dot.classList.toggle('picked', mc === country);
+      }
+    });
   }
 
   // 2026-09-18 추가: 짧은 구글맵 공유링크(maps.app.goo.gl)는 링크 안에 좌표가 없어 브라우저에서 CORS 없이는
@@ -3099,6 +3168,7 @@
 
   function renderRecap(){
     const panel = el('recapTabPanel');
+    teardownRecapMap();
     const trip = currentTrip();
     const list = tripExpenses(trip.id);
     if(!list.length){
@@ -3127,9 +3197,34 @@
       countryAgg[e.country].items.push(e);
     });
 
-    // 실좌표 우선: 링크 자체에 좌표가 있거나(드묾) Apps Script로 이미 풀어둔 캐시(data.placeAddrCoords)가
-    // 있으면 그 좌표로 진짜 지도를, 2곳 미만이면 국가 등장 순서 개략도로 — recapSelectCountry는 두 경우
-    // 모두 핀의 data-country만 보고 동작해서 이 블록만 바뀌어도 선택/상세 패널 로직은 그대로 재사용된다.
+    // 그 날 지출로 알 수 있는 "그 날의 대표 국가" — 구글 타임라인 GPS 기록에는 국가 정보가 없어서,
+    // 실제 지출이 있는 날은 그 국가로, 지출이 없는 날(이동일 등)은 가장 가까운 직전 날짜의 국가로 채운다.
+    const dateCountryTotals = {};
+    sortedList.forEach(e => {
+      (dateCountryTotals[e.date] = dateCountryTotals[e.date] || {});
+      dateCountryTotals[e.date][e.country] = (dateCountryTotals[e.date][e.country]||0) + e.amountKrw;
+    });
+    const dateCountryMap = {};
+    Object.keys(dateCountryTotals).forEach(d => {
+      dateCountryMap[d] = Object.entries(dateCountryTotals[d]).sort((a,b)=>b[1]-a[1])[0][0];
+    });
+    const knownDates = Object.keys(dateCountryMap).sort();
+    function countryForDate(dateStr){
+      if(dateCountryMap[dateStr]) return dateCountryMap[dateStr];
+      let best = knownDates[0];
+      for(const d of knownDates){ if(d <= dateStr) best = d; else break; }
+      return best ? dateCountryMap[best] : countryOrder[0];
+    }
+    function placeNameForLatLng(lat, lng){
+      const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+      if(data.placeNameOverride[key]) return data.placeNameOverride[key];
+      if(data.placeNameCache[key]) return data.placeNameCache[key].name;
+      return '';
+    }
+
+    // 실좌표 우선(순서: ①지출 주소에 직접 담긴 좌표 ②Apps Script로 풀어둔 캐시 ③구글 타임라인 GPS 기록),
+    // 2곳 미만이면 국가 등장 순서 개략도로 — recapSelectCountry는 두 경우 모두 핀의 data-country만 보고
+    // 동작해서 이 블록만 바뀌어도 선택/상세 패널 로직은 그대로 재사용된다.
     const realPoints = [];
     const seenPointKeys = new Set();
     sortedList.forEach(e => {
@@ -3145,11 +3240,22 @@
       seenPointKeys.add(key);
       realPoints.push({ lat: coord.lat, lng: coord.lng, country: e.country, date: e.date, name: e.placeName || placeNameFromAddr(e.placeAddr) || e.item });
     });
+    const tlData = data.timelineByTrip[trip.id];
+    if(tlData && tlData.visits){
+      tlData.visits.forEach(v => {
+        if(v.lat == null || v.lng == null) return;
+        const key = `${v.lat.toFixed(4)},${v.lng.toFixed(4)}`;
+        if(seenPointKeys.has(key)) return;
+        seenPointKeys.add(key);
+        realPoints.push({ lat: v.lat, lng: v.lng, country: countryForDate(v.date), date: v.date, name: v.label || placeNameForLatLng(v.lat, v.lng) || '' });
+      });
+    }
     realPoints.sort((a,b) => a.date.localeCompare(b.date));
 
     const usingRealMap = realPoints.length >= 2;
-    let pinsHtml;
-    if(usingRealMap){
+    const leafletAvailable = typeof L !== 'undefined'; // cdnjs가 차단된 네트워크 등에서 로드 실패 시 개략도로 자동 대체
+    let pinsHtml = '';
+    if(usingRealMap && !leafletAvailable){
       const lats = realPoints.map(p=>p.lat), lngs = realPoints.map(p=>p.lng);
       const latMin = Math.min(...lats), latMax = Math.max(...lats);
       const lngMin = Math.min(...lngs), lngMax = Math.max(...lngs);
@@ -3161,7 +3267,7 @@
         const top = (1 - (p.lat - L0) / (L1 - L0)) * 88 + 6;
         return `<div class="rc-pin ${i===realPoints.length-1?'now':''}" data-country="${escapeHtml(p.country)}" title="${escapeHtml(p.name)}" style="left:${left}%; top:${top}%;"></div>`;
       }).join('');
-    } else {
+    } else if(!usingRealMap){
       const n = countryOrder.length;
       const pinPos = countryOrder.map((c, i) => ({
         country: c,
@@ -3173,6 +3279,10 @@
         <div class="rc-pin-label" data-country="${escapeHtml(p.country)}" style="left:${Math.min(p.left+3,80)}%; top:${Math.max(p.top-11,2)}%;">${countryFlag(p.country)} ${escapeHtml(p.country)}</div>
       `).join('');
     }
+    const showLeafletMap = usingRealMap && leafletAvailable;
+    const mapFrameHtml = showLeafletMap
+      ? `<div class="rc-leaflet-map" id="rcLeafletMap"></div>`
+      : `<div class="rc-route-frame">${pinsHtml}</div>`;
 
     // 아직 좌표를 못 찾은(=한 번도 시도 안 한) 주소 개수 — 있으면 "좌표로 지도 정확하게 만들기" 버튼을 보여준다
     const unresolvedAddrs = new Set();
@@ -3183,11 +3293,15 @@
       unresolvedAddrs.add(e.placeAddr);
     });
     const hintText = usingRealMap
-      ? '실제 좌표 기반 지도예요. 핀이나 아래 칩을 눌러보세요.'
+      ? `실제 좌표 기반 지도예요${tlData && tlData.visits ? ` (구글 타임라인 GPS ${tlData.visits.length}곳 포함)` : ''}.${showLeafletMap ? ' 지도를 드래그·확대하거나 핀을 눌러보세요.' : ' 핀이나 아래 칩을 눌러보세요.'}`
       : '아직 정확한 좌표가 없어 국가가 바뀐 순서로 보여드려요. 핀이나 아래 칩을 눌러보세요.';
     const resolveBtnHtml = unresolvedAddrs.size
-      ? `<button type="button" class="toolbtn" id="resolveCoordsBtn" style="width:100%; justify-content:center; margin-bottom:14px;">📍 주소 ${unresolvedAddrs.size}곳 좌표로 지도 정확하게 만들기</button>`
+      ? `<button type="button" class="toolbtn" id="resolveCoordsBtn" style="width:100%; justify-content:center; margin-bottom:10px;">📍 주소 ${unresolvedAddrs.size}곳 좌표로 지도 정확하게 만들기</button>`
       : '';
+    const timelineUploadBtnHtml = `
+      <button type="button" class="toolbtn" id="timelineUploadBtn" style="width:100%; justify-content:center; margin-bottom:10px;">🌍 구글 타임라인(GPS) 불러오기${tlData ? ' — 다시 불러오기' : ''}</button>
+      <input type="file" id="timelineUploadFile" accept="application/json,.json" style="display:none;">
+    `;
 
     const chipsHtml = countryOrder.map(c => `
       <span class="rc-chip" data-country="${escapeHtml(c)}">
@@ -3260,24 +3374,116 @@
 
       <div class="sectionhead"><h3>다녀온 길</h3></div>
       <p class="rc-hint">${hintText}</p>
+      ${timelineUploadBtnHtml}
       ${resolveBtnHtml}
       ${wholeTripBtnHtml}
       <div class="panel" style="margin-bottom:24px;">
-        <div class="rc-route-frame">${pinsHtml}</div>
+        ${mapFrameHtml}
         <div class="rc-chips">${chipsHtml}</div>
         <div class="rc-detail-wrap">${detailHtml}</div>
       </div>
     `;
 
+    if(showLeafletMap) initRecapLeafletMap(realPoints, countryOrder);
     recapSelectCountry(countryOrder[countryOrder.length-1]);
   }
 
   el('recapTabPanel').addEventListener('click', e => {
+    if(e.target.closest('#timelineUploadBtn')){ const fi = el('timelineUploadFile'); if(fi) fi.click(); return; }
     if(e.target.closest('#resolveCoordsBtn')){ resolveAllTripAddrCoords(); return; }
     if(e.target.closest('.toolbtn') || e.target.closest('.miniicon')) return;
     const target = e.target.closest('.rc-pin, .rc-chip');
     if(target) recapSelectCountry(target.dataset.country);
   });
+  el('recapTabPanel').addEventListener('change', e => {
+    if(e.target.id === 'timelineUploadFile'){
+      const file = e.target.files[0];
+      handleTimelineUpload(file);
+      e.target.value = '';
+    }
+  });
+
+  // 2026-09-18 추가: 구글 타임라인(위치기록) 내보내기 JSON(semanticSegments 형식)을 읽어, 이 여행 기간에
+  // 해당하는 "visit"(체류 지점, 좌표 있음)만 뽑아 data.timelineByTrip에 저장한다. 원본 파일에는 그 사람의
+  // 전체 위치기록(수십MB, rawSignals 등)이 다 들어있어서, 여행 기간 것만 골라내고 나머지는 버려야
+  // localStorage가 감당할 수 있다. 좌표의 시간 문자열 끝에 붙는 +00:00 같은 오프셋 표기는 내보내기 과정의
+  // 알려진 버그로 실제와 다를 수 있어(예: 영국 방문인데 +02:00으로 찍히는 등) 신뢰하지 않고, 날짜·시각은
+  // 문자열 앞부분(오프셋 무시)을 그대로 현지 시각으로 취급한다.
+  function handleTimelineUpload(file){
+    if(!file) return;
+    const trip = currentTrip();
+    const btn = el('timelineUploadBtn');
+    if(btn){ btn.disabled = true; btn.textContent = '⏳ 파일을 읽는 중... (용량이 크면 몇십 초 걸릴 수 있어요)'; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const raw = JSON.parse(reader.result);
+        const segs = raw.semanticSegments;
+        if(!Array.isArray(segs)) throw new Error('semanticSegments 없음');
+
+        const pad = n => String(n).padStart(2,'0');
+        function addDaysStr(dateStr, days){
+          const d = new Date(dateStr+'T00:00:00');
+          d.setDate(d.getDate()+days);
+          return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+        }
+        const padStart = trip.startDate ? addDaysStr(trip.startDate, -2) : null;
+        const padEnd = trip.endDate ? addDaysStr(trip.endDate, 2) : null;
+
+        const visits = [];
+        segs.forEach(s => {
+          const v = s.visit;
+          if(!v) return;
+          const loc = v.topCandidate && v.topCandidate.placeLocation && v.topCandidate.placeLocation.latLng;
+          if(!loc) return;
+          const m = loc.match(/(-?\d+\.?\d*)°,\s*(-?\d+\.?\d*)°/);
+          if(!m) return;
+          const dateStr = (s.startTime||'').slice(0,10);
+          if(!dateStr) return;
+          if(padStart && dateStr < padStart) return;
+          if(padEnd && dateStr > padEnd) return;
+          visits.push({
+            date: dateStr,
+            startTime: (s.startTime||'').slice(11,16),
+            endTime: (s.endTime||'').slice(11,16),
+            kind: 'visit',
+            label: null,
+            lat: parseFloat(m[1]),
+            lng: parseFloat(m[2]),
+            hasOffset: true
+          });
+        });
+        visits.sort((a,b) => (a.date+a.startTime).localeCompare(b.date+b.startTime));
+
+        if(!visits.length){
+          showToast('이 여행 기간(±2일)에 해당하는 위치 기록을 찾지 못했어요');
+          return;
+        }
+        data.timelineByTrip[trip.id] = { fileName: file.name, uploadedAt: new Date().toISOString(), visits };
+        saveData(data);
+        renderRecap();
+        showToast(`구글 타임라인에서 실제 위치 ${visits.length}곳을 불러왔습니다`);
+      }catch(err){
+        console.warn('타임라인 파싱 실패', err);
+        showToast('타임라인 파일을 읽는 데 실패했어요. 구글맵 앱 "위치기록/타임라인 내보내기"로 받은 JSON 파일인지 확인해주세요.');
+      }finally{
+        const btnAfter = el('timelineUploadBtn');
+        if(btnAfter){
+          btnAfter.disabled = false;
+          btnAfter.textContent = '🌍 구글 타임라인(GPS) 불러오기' + (data.timelineByTrip[trip.id] ? ' — 다시 불러오기' : '');
+        }
+      }
+    };
+    reader.onerror = () => {
+      showToast('파일을 읽는 데 실패했어요');
+      const btnAfter = el('timelineUploadBtn');
+      if(btnAfter){
+        btnAfter.disabled = false;
+        btnAfter.textContent = '🌍 구글 타임라인(GPS) 불러오기' + (data.timelineByTrip[trip.id] ? ' — 다시 불러오기' : '');
+      }
+    };
+    reader.readAsText(file);
+  }
 
   // ---------- 전체 여행 통합 통계 ----------
   // 현재 여행뿐 아니라 저장된 모든 여행의 지출을 합산해 연도별/카테고리별 누적 통계를 보여준다.
