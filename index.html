@@ -83,6 +83,46 @@
   /* ---------- body ---------- */
   .body{ padding:22px 28px 0; }
 
+  /* ---------- 메인 탭(지출내역 / 여행기록) ---------- */
+  .maintabs{ display:flex; gap:6px; margin-bottom:20px; }
+  .maintab{ flex:1; background:var(--surface); border:1px solid var(--line2); color:var(--ink2); font-weight:700; font-size:13px; padding:10px 12px; border-radius:11px; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .maintab.active{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+
+  /* ---------- 여행기록 탭 ---------- */
+  .rc-stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:22px; }
+  .rc-stat{ background:var(--surface); border:1px solid var(--line2); border-radius:12px; padding:12px 8px; text-align:center; }
+  .rc-stat .v{ font-family:'Unbounded','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR',sans-serif; font-size:17px; font-weight:700; color:var(--accent); }
+  .rc-stat .l{ font-size:10.5px; color:var(--ink2); margin-top:3px; }
+  .rc-route-frame{ position:relative; height:130px; border-radius:12px; background:var(--bg); border:1px solid var(--line2); overflow:hidden; margin-bottom:14px; }
+  .rc-pin{ position:absolute; width:11px; height:11px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px var(--surface), 0 0 0 5px var(--accent); transition:transform .2s ease, opacity .2s ease; }
+  .rc-pin.now{ background:var(--warn); box-shadow:0 0 0 4px var(--surface), 0 0 0 5px var(--warn); }
+  .rc-pin.dim{ opacity:.25; }
+  .rc-pin.picked{ transform:scale(1.3); }
+  .rc-pin-label{ position:absolute; font-size:10.5px; color:var(--ink2); white-space:nowrap; transition:opacity .2s ease; }
+  .rc-pin-label.dim{ opacity:.25; }
+  .rc-chips{ display:flex; gap:8px; flex-wrap:wrap; }
+  .rc-chip{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; border:1px solid var(--line2); border-radius:10px; padding:6px 10px; background:var(--bg); color:var(--ink); }
+  .rc-chip .dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .rc-chip .amt{ color:var(--ink2); margin-left:2px; }
+  .rc-timeline{ position:relative; padding-left:22px; }
+  .rc-timeline::before{ content:''; position:absolute; left:4px; top:6px; bottom:6px; width:2px; background:var(--line2); }
+  .rc-node{ position:relative; padding:10px 8px 16px 0; margin:0 -8px; border-radius:10px; cursor:pointer; border:1px solid transparent; }
+  .rc-node:hover{ background:var(--bg); }
+  .rc-node.active{ background:var(--bg); border-color:var(--line2); }
+  .rc-dot{ position:absolute; left:-22px; top:13px; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--surface); transition:transform .2s ease; }
+  .rc-dot.now{ background:var(--warn); }
+  .rc-node.active .rc-dot{ transform:scale(1.25); }
+  .rc-tag{ font-size:11px; color:var(--ink3); margin-bottom:3px; padding-left:8px; font-weight:700; }
+  .rc-title{ font-weight:700; font-size:14px; margin-bottom:3px; padding-left:8px; }
+  .rc-note{ color:var(--ink2); font-size:12.5px; margin-bottom:8px; padding-left:8px; line-height:1.5; }
+  .rc-foot{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-left:8px; }
+  .rc-place-badge{ font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--bg); border:1px solid var(--line2); color:var(--ink2); }
+  .rc-spend{ font-size:11.5px; color:var(--ink2); }
+  .rc-spend b{ color:var(--ink); font-weight:700; }
+  .rc-route-link{ margin-left:auto; font-size:11.5px; font-weight:700; color:var(--accent); text-decoration:none; padding:5px 10px; border-radius:99px; background:var(--bg); border:1px solid var(--line2); }
+  .rc-empty{ font-size:12.5px; color:var(--ink3); padding:24px 0; text-align:center; }
+  .rc-hint{ font-size:11px; color:var(--ink3); margin:-6px 0 14px; }
+
   .panels{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:24px; }
   @media (max-width:640px){ .panels{ grid-template-columns:1fr; } }
   .panel{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:16px 16px 14px; }
@@ -553,6 +593,11 @@
 <div class="wrap">
   <div class="body">
 
+    <div class="maintabs" id="mainTabs">
+      <button type="button" class="maintab active" id="mainTabExpense" data-maintab="expense">📋 지출내역</button>
+      <button type="button" class="maintab" id="mainTabRecap" data-maintab="recap">🗺 여행기록</button>
+    </div>
+
     <div id="expenseTabPanel">
 
     <div class="summary-panels-wrap">
@@ -709,6 +754,8 @@
     </div>
 
     </div>
+
+    <div id="recapTabPanel" style="display:none;"></div>
 
   </div>
 </div>
@@ -917,8 +964,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-17-01';
+  const APP_BUILD = '2026-09-18-01';
   const CHANGELOG = [
+    { date: '2026-09-18', note: '상단에 "🗺 여행기록" 탭 추가 — 국가가 바뀐 순서로 보는 경로, Day별 타임라인(메모·대표 장소·지출·동선 보기 링크)을 한 화면에서 확인. Day를 누르면 위 경로에서 그 나라가 강조됨.' },
     { date: '2026-09-17', note: '"오늘 동선 전체보기"에서 좌표를 못 찾은 장소(짧은 공유링크 등)는 도시·국가를 붙여서 검색하도록 개선 — 맥도날드 등 흔한 체인점의 정확한 지점을 더 잘 찾음. "앱 정보 · 수정 이력" 화면 추가.' },
     { date: '2026-09-15', note: '신한카드 해외승인 문자(통화코드 대신 "유로" 같은 한글 통화명 표기) 인식 추가. 원화 금액을 못 찾을 때 누적잔액 숫자가 거래금액으로 잘못 채워지던 버그 수정.' },
     { date: '2026-09-13', note: '국민카드 해외승인 문자("금액(통화코드)" 순서, 예: 10.36(EUR)) 인식 추가. 가맹점명 앞에 붙는 국가약칭(예: "스페") 자동 제거.' },
@@ -1969,6 +2017,7 @@
     renderPanelsToggle();
     renderDayGroups();
     renderBulkBar();
+    if(el('recapTabPanel').style.display !== 'none') renderRecap();
   }
 
   // ---------- 토스트 ----------
@@ -2957,6 +3006,161 @@
       render();
       el('dayGroups').scrollIntoView({ behavior:'smooth', block:'start' });
     }
+  });
+
+  // ---------- 여행기록 탭 (지도 없이, 국가 등장 순서 + Day별 타임라인으로 여행 경로를 훑어봄) ----------
+  // "지출내역" 탭과 같은 위치의 새 상단 탭. 실제 지출 데이터(국가/장소/금액)와 Day별 메모(itineraryDays)만으로
+  // 만든다 — 현재 저장된 timelineByTrip(구글 타임라인 GPS 기록)은 여행 초반 며칠치만 있고 그 뒤로는 비어 있어서
+  // 좌표 기반 실사 지도 대신, 국가가 바뀌는 순서를 이어붙인 개략도(schematic) 형태로 "경로"를 보여준다.
+  el('mainTabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-maintab]');
+    if(!btn) return;
+    const tab = btn.dataset.maintab;
+    el('mainTabExpense').classList.toggle('active', tab === 'expense');
+    el('mainTabRecap').classList.toggle('active', tab === 'recap');
+    el('expenseTabPanel').style.display = tab === 'expense' ? '' : 'none';
+    el('recapTabPanel').style.display = tab === 'recap' ? '' : 'none';
+    if(tab === 'recap') renderRecap();
+  });
+
+  const RECAP_DOT_COLORS = ['var(--accent)', 'var(--good)', 'var(--warn)', '#8B6FDA', '#2E86AB'];
+
+  function recapSelectDay(dateStr){
+    const panel = el('recapTabPanel');
+    panel.querySelectorAll('.rc-node').forEach(n => n.classList.toggle('active', n.dataset.date === dateStr));
+    const activeNode = panel.querySelector(`.rc-node[data-date="${dateStr}"]`);
+    const country = activeNode ? activeNode.dataset.country : null;
+    panel.querySelectorAll('.rc-pin').forEach(p => {
+      p.classList.toggle('dim', p.dataset.country !== country);
+      p.classList.toggle('picked', p.dataset.country === country);
+    });
+    panel.querySelectorAll('.rc-pin-label').forEach(l => l.classList.toggle('dim', l.dataset.country !== country));
+  }
+
+  function renderRecap(){
+    const panel = el('recapTabPanel');
+    const trip = currentTrip();
+    const list = tripExpenses(trip.id);
+    if(!list.length){
+      panel.innerHTML = '<div class="rc-empty">아직 지출 내역이 없어 여행기록을 만들 수 없어요.<br>지출내역 탭에서 먼저 추가해주세요.</div>';
+      return;
+    }
+
+    // 날짜별 그룹(지출이 있는 날만, 오래된 순)
+    const groups = {};
+    const dateOrder = [];
+    list.forEach(e => { if(!groups[e.date]){ groups[e.date] = []; dateOrder.push(e.date); } groups[e.date].push(e); });
+    dateOrder.sort();
+
+    const totalSpent = list.reduce((s,e)=>s+e.amountKrw, 0);
+    let dayCount = dateOrder.length;
+    if(trip.startDate && trip.endDate){
+      dayCount = Math.round((new Date(trip.endDate+'T00:00:00') - new Date(trip.startDate+'T00:00:00')) / 86400000) + 1;
+    }
+
+    // 국가가 처음 등장한 순서대로 나열 + 국가별 방문일수·지출합계
+    const countryAgg = {};
+    const countryOrder = [];
+    dateOrder.forEach(dateStr => {
+      groups[dateStr].forEach(e => {
+        if(!countryAgg[e.country]){ countryAgg[e.country] = { days: new Set(), total: 0 }; countryOrder.push(e.country); }
+        countryAgg[e.country].days.add(dateStr);
+        countryAgg[e.country].total += e.amountKrw;
+      });
+    });
+
+    // 그 날 지출이 가장 많은 국가를 "그 날의 대표 국가"로 삼아, 타임라인 노드↔경로 핀을 연결한다
+    function mainCountryOf(items){
+      const totals = {};
+      items.forEach(e => { totals[e.country] = (totals[e.country]||0) + e.amountKrw; });
+      return Object.entries(totals).sort((a,b)=>b[1]-a[1])[0][0];
+    }
+
+    const n = countryOrder.length;
+    const pinPos = countryOrder.map((c, i) => ({
+      country: c,
+      left: n > 1 ? 10 + i * (78/(n-1)) : 45,
+      top: n > 1 ? 78 - i * (54/(n-1)) : 45
+    }));
+    const pathPoints = pinPos.map(p => `${p.left*4},${p.top*1.3}`).join(' L ');
+
+    const pinsHtml = pinPos.map((p, i) => `
+      <div class="rc-pin ${i===n-1?'now':''}" data-country="${escapeHtml(p.country)}" style="left:${p.left}%; top:${p.top}%;"></div>
+      <div class="rc-pin-label" data-country="${escapeHtml(p.country)}" style="left:${Math.min(p.left+3,80)}%; top:${Math.max(p.top-11,2)}%;">${countryFlag(p.country)} ${escapeHtml(p.country)}</div>
+    `).join('');
+
+    const chipsHtml = countryOrder.map((c, i) => `
+      <span class="rc-chip">
+        <span class="dot" style="background:${RECAP_DOT_COLORS[i % RECAP_DOT_COLORS.length]};"></span>
+        ${countryFlag(c)} ${escapeHtml(c)} · ${countryAgg[c].days.size}일
+        <span class="amt tabular">${won(countryAgg[c].total)}</span>
+      </span>
+    `).join('');
+
+    const timelineHtml = dateOrder.map(dateStr => {
+      const items = groups[dateStr];
+      const info = dayInfo(trip, dateStr);
+      const total = items.reduce((s,e)=>s+e.amountKrw, 0);
+      const country = mainCountryOf(items);
+      const placedItems = items.filter(e => e.placeAddr || e.placeName);
+      const itinDay = data.itineraryDays.find(d => d.tripId === trip.id && d.date === dateStr);
+      const note = itinDay && itinDay.note ? itinDay.note.split('\n')[0] : '';
+
+      let title = note.slice(0, 44) || '';
+      if(!title){
+        const withPlace = placedItems[0];
+        const topExpense = items.slice().sort((a,b)=>b.amountKrw-a.amountKrw)[0];
+        title = withPlace ? (withPlace.placeName || placeNameFromAddr(withPlace.placeAddr) || withPlace.item)
+          : (topExpense ? topExpense.item : '');
+      }
+      const sub = note && note.slice(0,44) !== title ? '' : (note.length > 44 ? note.slice(44, 44+50) : '');
+
+      const routeUrl = buildDayRouteUrl(placedItems);
+      const routeLinkHtml = routeUrl
+        ? `<a class="rc-route-link" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🧭 동선 보기</a>`
+        : '';
+
+      return `<div class="rc-node" data-date="${dateStr}" data-country="${escapeHtml(country)}">
+        <div class="rc-dot ${dateStr===dateOrder[dateOrder.length-1]?'now':''}"></div>
+        <div class="rc-tag">${info.label} · ${dateStr.slice(5).replace('-','.')}</div>
+        <div class="rc-title">${escapeHtml(title || '기록 없음')}</div>
+        ${sub ? `<div class="rc-note">${escapeHtml(sub)}</div>` : ''}
+        <div class="rc-foot">
+          <span class="rc-place-badge">${countryFlag(country)} ${escapeHtml(country)}</span>
+          <span class="rc-spend">${items.length}건 · <b class="tabular">${won(total)}</b></span>
+          ${routeLinkHtml}
+        </div>
+      </div>`;
+    }).join('');
+
+    panel.innerHTML = `
+      <div class="rc-stats">
+        <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 기간</div></div>
+        <div class="rc-stat"><div class="v tabular">${countryOrder.length}개국</div><div class="l">${countryOrder.map(countryFlag).join('')}</div></div>
+        <div class="rc-stat"><div class="v tabular">${won(totalSpent)}</div><div class="l">전체 지출</div></div>
+      </div>
+
+      <div class="sectionhead"><h3>다녀온 순서</h3></div>
+      <p class="rc-hint">구글맵 GPS 기록이 여행 초반만 남아있어, 정확한 위치 지도 대신 국가가 바뀐 순서로 보여드려요. 핀을 눌러도 되고, 아래 Day를 눌러도 여기가 같이 움직여요.</p>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="rc-route-frame">${pinsHtml}</div>
+        <div class="rc-chips">${chipsHtml}</div>
+      </div>
+
+      <div class="sectionhead"><h3>Day별 타임라인</h3></div>
+      <p class="rc-hint">실제 지출·메모 기록 기준입니다. Day를 누르면 위 경로에서 그 나라가 강조됩니다.</p>
+      <div class="panel" style="margin-bottom:24px;">
+        <div class="rc-timeline">${timelineHtml}</div>
+      </div>
+    `;
+
+    recapSelectDay(dateOrder[dateOrder.length-1]);
+  }
+
+  el('recapTabPanel').addEventListener('click', e => {
+    if(e.target.closest('.rc-route-link')) return;
+    const node = e.target.closest('.rc-node');
+    if(node) recapSelectDay(node.dataset.date);
   });
 
   // ---------- 전체 여행 통합 통계 ----------
