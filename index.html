@@ -152,13 +152,6 @@
   .rc-spend b{ color:var(--ink); font-weight:700; }
   .rc-empty{ font-size:12.5px; color:var(--ink3); padding:24px 0; text-align:center; }
   .rc-hint{ font-size:11px; color:var(--ink3); margin:-6px 0 14px; }
-  .rc-cityrange-tool{ margin-bottom:4px; }
-  .rc-cityrange-panel{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:14px; margin-bottom:14px; }
-  .rc-cityrange-panel .note{ font-size:11.5px; color:var(--ink2); line-height:1.5; margin:0 0 10px; }
-  .rc-cityrange-panel textarea{
-    width:100%; box-sizing:border-box; border:1px solid var(--line2); border-radius:8px; padding:9px 10px;
-    font-size:12.5px; font-family:inherit; color:var(--ink); background:var(--bg); resize:vertical; line-height:1.5;
-  }
   .rc-detail-wrap{ border-top:1px solid var(--line2); padding-top:16px; }
   .rc-detail-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   .rc-places{ display:flex; flex-direction:column; gap:2px; }
@@ -470,6 +463,11 @@
   .drawer .addchip{ display:flex; gap:8px; }
   .drawer .addchip input{ flex:1; border:1px solid var(--line2); border-radius:8px; padding:7px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); }
   .drawer .addchip button{ background:var(--ink); color:var(--bg); border:none; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; }
+  .citycountry-block{ margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--line2); }
+  .citycountry-block:last-child{ margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .citycountry-head{ font-size:12.5px; font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .citycountry-block .chiprow:empty{ display:none; }
+  .citycountry-empty{ font-size:12px; color:var(--ink3); margin:0 0 10px; }
   .fxrate-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
   .fxrate-row .fxrate-label{ width:44px; flex-shrink:0; font-weight:700; font-size:12.5px; color:var(--ink); }
   .fxrate-row input{ flex:1; border:1px solid var(--line2); border-radius:8px; padding:7px 10px; font-size:12.5px; background:var(--bg); color:var(--ink); }
@@ -745,7 +743,7 @@
             <input type="date" id="newDate">
             <select id="newCategory"></select>
             <select id="newCountry"></select>
-            <input type="text" id="newCity" placeholder="도시 (선택)">
+            <select id="newCity"></select>
           </div>
           <div class="addrow-grid2">
             <select id="newCurrency"></select>
@@ -849,6 +847,12 @@
         <input type="text" id="newCountryInput" placeholder="새 국가 (예: 프랑스)">
         <button id="addCountryBtn">추가</button>
       </div>
+    </div>
+
+    <div class="block">
+      <h4>도시 관리</h4>
+      <p class="note" style="margin-bottom:10px;">국가별로 도시를 등록해두면, 지출 추가/수정 시 직접 입력하지 않고 목록에서 바로 선택할 수 있어요.</p>
+      <div id="cityManagePanel"></div>
     </div>
 
     <div class="block">
@@ -993,8 +997,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-08';
+  const APP_BUILD = '2026-09-19-09';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '도시 입력 방식을 전면 개편 — 자유입력 텍스트 칸을 없애고, 국가별로 등록해둔 도시 목록에서 드롭다운으로 선택하도록 바꿈. 설정에 "도시 관리" 화면을 새로 추가해 국가마다 도시를 추가·이름수정·삭제할 수 있고(카테고리/국가/통화 관리와 같은 방식), 지출 추가 화면에서도 "+ 새 도시 추가"로 바로 등록 가능. 예전엔 지출 수정 화면에 도시 입력칸 자체가 없어서 한 번 잘못 입력하거나 비워둔 도시를 고칠 방법이 없었는데, 이제 수정 화면에도 도시 드롭다운이 추가되어 언제든 바로잡을 수 있음. 기존에 자유입력으로 넣어뒀던 도시명(런던·바르셀로나 등)은 전부 자동으로 새 도시 목록에 편입되어 그대로 드롭다운에 나타남. 정확도가 낮았던 "도시별" 탭의 주소 기반 자동 인식(역지오코딩)과 "구간별 도시 일괄 지정" 도구는 이번 방식으로 대체되어 제거됨.' },
     { date: '2026-09-19', note: '"도시별" 탭에 "📅 구간별로 도시 일괄 지정" 도구 추가 — 자동 인식(역지오코딩)이 미덥지 않을 때를 위해, "09-09|런던"처럼 "그 도시에 머문 마지막 날짜 | 도시명"을 한 줄씩 적으면 여행 시작일부터 그 날짜까지(그다음 줄은 이전 구간 다음날부터) 해당하는 지출들의 도시를 한 번에 확실하게 덮어씀. 좌표 조회에 기대지 않는 방식이라 100% 정확하게 반영되고, 한국으로 표기된 지출은 자동으로 건너뜀. 입력창은 기본으로 09-09 런던, 09-13 바르셀로나, 09-15 그라나다, 09-19 세비야로 미리 채워져 있어 "일괄 적용" 한 번이면 끝.' },
     { date: '2026-09-19', note: '"도시별" 자동 인식이 계속 "기타"에서 안 바뀌던 문제의 진짜 원인을 찾아 수정 — Apps Script 백엔드로 안정성을 높인 지난 수정 이전에, 대부분의 좌표가 "시도했지만 못 찾음(null)"으로 이미 캐시돼 있었는데, 그 캐시가 있으면 무조건 "이미 시도해봄"으로 보고 다시는 재시도를 안 하던 버그가 있었음(백엔드가 아무리 좋아져도 이미 null로 저장된 좌표는 영영 그대로 남는 구조였음). 이제는 실제로 도시명을 찾았을 때만 캐시하고, 못 찾은 좌표는 캐시하지 않아 "도시별" 탭을 열 때마다 항상 다시 시도함 — 기존에 잘못 저장된 null 캐시도 자동으로 다시 풀림. 인식 결과 토스트에 Apps Script 응답이 없었는지도 함께 표시해서(예: "code.gs 재배포를 확인해주세요") 원인을 바로 알 수 있게 함.' },
     { date: '2026-09-19', note: '"도시별" 자동 도시 인식이 대부분 "기타"로만 빠지던 문제 개선 — 브라우저가 Nominatim(OpenStreetMap 역지오코딩)을 직접 호출하면 앱을 식별할 방법이 마땅치 않아 조용히 막히는 경우가 많았는데, 이미 구글지도 짧은 링크 풀이에 쓰고 있는 Apps Script 백엔드를 거치도록 바꿔 훨씬 안정적으로 도시를 찾아오게 함(설정에 Google Drive 자동 백업 URL이 등록돼 있어야 하며, code.gs를 최신 버전으로 다시 배포해야 적용됨). 미설정 시에는 예전처럼 브라우저 직접 호출로 자동 대체.' },
@@ -1131,7 +1136,7 @@
       placeNameCache: {},
       placeNameOverride: {},
       placeAddrCoords: {},
-      placeCityCache: {},
+      citiesByCountry: {},
       lastFxRate: {},
       settings: { driveUrl: "", lastBackup: null, autoBackup: false, periodicBackup: false, periodicIntervalMinutes: 60 }
     };
@@ -1156,11 +1161,11 @@
     // 키는 placeAddr 원문 그대로 — { lat, lng, resolvedUrl, resolvedAt }. 좌표를 못 찾은 경우도
     // lat:null로 저장해 매번 다시 시도하지 않는다.
     if(!d.placeAddrCoords) d.placeAddrCoords = {};
-    // 2026-09-19 추가: 도시를 직접 입력 안 한 지출도 "도시별" 탭에서 자동으로 분류할 수 있도록,
-    // 좌표 기준으로 역지오코딩(Nominatim)한 도시명을 캐시해둔다. 키는 좌표를 소수점 2자리로 반올림한
-    // 값("위도,경도") — 같은 동네(대략 1km 이내) 좌표는 API를 다시 부르지 않고 캐시를 재사용한다.
-    // 값이 null이면 "찾아봤지만 도시명이 없었음"으로 확정 캐시(재시도 안 함), 키 자체가 없으면 "아직 시도 안 함".
-    if(!d.placeCityCache) d.placeCityCache = {};
+    // 2026-09-19 추가: 도시를 국가별 목록으로 관리(설정 "도시 관리"에서 추가/수정/삭제) — 지출 추가/수정 화면에서는
+    // 직접 입력 대신 이 목록에서 드롭다운으로 선택한다. 국가가 새로 추가되거나 아직 목록이 없던 예전 데이터도
+    // 항상 빈 배열로 채워둬서 이후 코드에서 매번 존재 여부를 따로 체크하지 않아도 되게 한다.
+    if(!d.citiesByCountry || typeof d.citiesByCountry !== 'object') d.citiesByCountry = {};
+    d.countries.forEach(c => { if(!Array.isArray(d.citiesByCountry[c])) d.citiesByCountry[c] = []; });
     if(!d.lastFxRate) d.lastFxRate = {};
     if(!d.settings) d.settings = { driveUrl:"", lastBackup:null, autoBackup:false, periodicBackup:false, periodicIntervalMinutes:60 };
     if(typeof d.settings.driveUrl !== 'string') d.settings.driveUrl = "";
@@ -1206,6 +1211,18 @@
         (d.expenses||[]).forEach(e => { if(e.category === '음료') e.category = '음료/간식'; });
       }
       d._migrations.renameBeverageCategory = true;
+    }
+    // 일회성 마이그레이션: 예전에는 도시를 지출마다 자유입력(텍스트)했었다. 그렇게 이미 입력해둔 도시명들을
+    // 국가별 도시 목록(citiesByCountry)에 자동으로 편입시켜, 드롭다운 방식으로 바뀐 뒤에도 기존 지출의
+    // 도시명이 목록에 그대로 나타나게 한다. 이후 사용자가 목록에서 지워도 다시 채우지 않도록 한 번만 실행한다.
+    if(!d._migrations.migrateFreeTextCitiesToList){
+      (d.expenses||[]).forEach(e => {
+        const city = (e.city||'').trim();
+        if(!city || !e.country) return;
+        if(!Array.isArray(d.citiesByCountry[e.country])) d.citiesByCountry[e.country] = [];
+        if(!d.citiesByCountry[e.country].includes(city)) d.citiesByCountry[e.country].push(city);
+      });
+      d._migrations.migrateFreeTextCitiesToList = true;
     }
     return d;
   }
@@ -1462,6 +1479,19 @@
       sel.value = (recent && data.countries.includes(recent.country)) ? recent.country : (data.countries[0] || '');
     }
   }
+  // 2026-09-19 추가: 도시는 자유입력 대신 선택한 국가에 등록된 도시 목록(설정 "도시 관리")에서 고르게 한다.
+  // 국가를 바꾸면 그 국가의 도시 목록으로 다시 채워진다.
+  function renderCityOptions(){
+    const sel = el('newCity');
+    if(!sel) return;
+    const prev = sel.value;
+    const country = el('newCountry').value;
+    const cities = (data.citiesByCountry[country] || []);
+    sel.innerHTML = '<option value="">도시 (선택 안 함)</option>'
+      + cities.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')
+      + '<option value="__addnew__">+ 새 도시 추가</option>';
+    sel.value = cities.includes(prev) ? prev : '';
+  }
   // 상세 필터(카테고리/국가 복수선택 + 금액범위) 칩 렌더
   function renderFilterChips(){
     el('filterCategoryChips').innerHTML = data.categories.map(c => {
@@ -1493,12 +1523,26 @@
     const sel = el('newCountry');
     if(sel.value === '__addnew__'){
       const name = (prompt('추가할 국가 이름을 입력하세요') || '').trim();
-      if(name && !data.countries.includes(name)){ data.countries.push(name); saveData(data); }
+      if(name && !data.countries.includes(name)){ data.countries.push(name); data.citiesByCountry[name] = []; saveData(data); }
       renderCountryOptions();
       renderChips();
       sel.value = (name && data.countries.includes(name)) ? name : (data.countries[0] || '');
     }
+    renderCityOptions();
     applyTimezoneConversion();
+  });
+  el('newCity').addEventListener('change', () => {
+    const sel = el('newCity');
+    if(sel.value !== '__addnew__') return;
+    const country = el('newCountry').value;
+    const name = (prompt('추가할 도시 이름을 입력하세요') || '').trim();
+    if(name){
+      if(!Array.isArray(data.citiesByCountry[country])) data.citiesByCountry[country] = [];
+      if(!data.citiesByCountry[country].includes(name)){ data.citiesByCountry[country].push(name); saveData(data); }
+      renderCityManagePanel();
+    }
+    renderCityOptions();
+    sel.value = (name && data.citiesByCountry[country] && data.citiesByCountry[country].includes(name)) ? name : '';
   });
 
   function renderChips(){
@@ -1523,6 +1567,30 @@
     }).join('');
 
     renderFxRatePanel();
+  }
+  // 2026-09-19 추가: 설정 "도시 관리" — 국가별로 묶어서 도시 칩을 보여주고, 그 아래 칩에서 바로 이름 수정/삭제,
+  // 국가별 입력창에서 새 도시 추가가 가능하게 한다(지출 추가/수정 화면의 도시 드롭다운이 이 목록을 그대로 씀).
+  function renderCityManagePanel(){
+    const panel = el('cityManagePanel');
+    if(!panel) return;
+    const usedPairs = new Set(
+      data.expenses.filter(e => e.city && e.city.trim()).map(e => e.country + '\u0000' + e.city.trim())
+    );
+    panel.innerHTML = data.countries.map(country => {
+      const cities = data.citiesByCountry[country] || [];
+      const chipsHtml = cities.map(c => {
+        const inUse = usedPairs.has(country + '\u0000' + c);
+        return `<span class="chip">${escapeHtml(c)}<button data-rename-city="${escapeHtml(c)}" data-city-country="${escapeHtml(country)}" title="이름 수정">✎</button>${inUse ? '' : ` <button data-remove-city="${escapeHtml(c)}" data-city-country="${escapeHtml(country)}" title="삭제">✕</button>`}</span>`;
+      }).join('');
+      return `<div class="citycountry-block">
+        <div class="citycountry-head">${countryFlag(country)} ${escapeHtml(country)}</div>
+        ${cities.length ? `<div class="chiprow">${chipsHtml}</div>` : `<p class="citycountry-empty">등록된 도시가 없어요</p>`}
+        <div class="addchip">
+          <input type="text" data-new-city-input="${escapeHtml(country)}" placeholder="새 도시 (예: 런던)">
+          <button data-add-city-btn="${escapeHtml(country)}">추가</button>
+        </div>
+      </div>`;
+    }).join('');
   }
   // 카테고리/국가/통화/카드구분 이름 변경 — 목록의 이름만 바꾸는 게 아니라 이미 저장된 지출 내역에서도
   // 옛 이름을 쓰던 항목을 전부 새 이름으로 함께 바꿔줘야 데이터가 끊기지 않는다(그래서 사용 중이어도 삭제와
@@ -2011,8 +2079,10 @@
     renderTripList();
     renderCategoryOptions();
     renderCountryOptions();
+    renderCityOptions();
     renderCurrencyOptions();
     renderChips();
+    renderCityManagePanel();
     renderFilterChips();
     renderStorageUsage();
     renderBackupSettings();
@@ -2543,7 +2613,7 @@
     const date = el('newDate').value;
     const category = el('newCategory').value;
     const country = el('newCountry').value;
-    const city = el('newCity').value.trim();
+    const city = el('newCity').value === '__addnew__' ? '' : el('newCity').value.trim();
     const currency = el('newCurrency').value;
     const amount = Number(el('newAmount').value);
     const fxRate = Number(el('newFxRate').value);
@@ -2703,6 +2773,12 @@
     if(!row) return;
     const catOptions = data.categories.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.category?'selected':''}>${escapeHtml(c)}</option>`).join('');
     const countryOptions = data.countries.map(c=>`<option value="${escapeHtml(c)}" ${c===exp.country?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    // 2026-09-19 추가: 도시도 지출 추가 화면과 같은 방식으로 국가별 목록에서 드롭다운으로 고른다(수정 가능하게 보완).
+    const cityOptionsFor = (country, currentCity) => {
+      const cities = data.citiesByCountry[country] || [];
+      return '<option value="">도시 (선택 안 함)</option>'
+        + cities.map(c => `<option value="${escapeHtml(c)}" ${c===currentCity?'selected':''}>${escapeHtml(c)}</option>`).join('');
+    };
     const expCurrency = exp.currency || 'KRW';
     const currencyOptions = data.currencies.map(c=>`<option value="${escapeHtml(c)}" ${c===expCurrency?'selected':''}>${escapeHtml(c)}</option>`).join('');
     // 수정모드는 내가 실제로 입력했던 화폐 그대로 보여주고 고친다(항상 원화로 강제 변환해 보여주지 않음) — 리스트 화면은 지금처럼 원화 표시 유지.
@@ -2724,6 +2800,7 @@
       <input type="date" value="${exp.date}" data-f="date">
       <select data-f="category">${catOptions}</select>
       <select data-f="country">${countryOptions}</select>
+      <select data-f="city">${cityOptionsFor(exp.country, exp.city||'')}</select>
       <input type="text" value="${escapeHtml(exp.time||'')}" data-f="time" placeholder="⏱ 시각 HH:MM (선택)">
       <input type="text" value="${escapeHtml(exp.placeName||'')}" data-f="placeName" placeholder="상호명 (선택)">
       <input type="text" value="${escapeHtml(exp.placeAddr||'')}" data-f="placeAddr" placeholder="🗺 구글지도 주소/링크 (선택)">
@@ -2752,6 +2829,9 @@
       updateEditFxPreview();
     });
     row.querySelector('[data-f="amount"]').addEventListener('input', updateEditFxPreview);
+    row.querySelector('[data-f="country"]').addEventListener('change', e => {
+      row.querySelector('[data-f="city"]').innerHTML = cityOptionsFor(e.target.value, '');
+    });
     row.querySelector('[data-f="fxRate"]').addEventListener('input', updateEditFxPreview);
     updateEditFxPreview();
     const photoRow = row.querySelector('[data-photo-row]');
@@ -2816,6 +2896,7 @@
       const date = row.querySelector('[data-f="date"]').value;
       const category = row.querySelector('[data-f="category"]').value;
       const country = row.querySelector('[data-f="country"]').value;
+      const city = row.querySelector('[data-f="city"]').value;
       const item = row.querySelector('[data-f="item"]').value.trim();
       const currency = row.querySelector('[data-f="currency"]').value;
       const amount = Number(row.querySelector('[data-f="amount"]').value);
@@ -2828,7 +2909,7 @@
       if(!date || !item || !amount || amount<=0){ showToast('입력값을 확인해주세요'); return; }
       if(currency !== 'KRW' && (!fxRate || fxRate<=0)){ showToast('환율을 입력해주세요'); return; }
       const amountKrw = computeKrw(currency, amount, fxRate);
-      exp.date = date; exp.category = category; exp.country = country; exp.item = item;
+      exp.date = date; exp.category = category; exp.country = country; exp.city = city; exp.item = item;
       exp.currency = currency;
       exp.amountForeign = currency === 'KRW' ? null : amount;
       exp.amountKrw = amountKrw;
@@ -3075,12 +3156,6 @@
   let rcMarkers = [];
   let rcMiniMaps = [];
   let recapView = 'map'; // 'map' | 'mini' | 'cities' — "여행기록" 안의 하위 탭(시안 1·2번을 정식 탭으로 편입)
-  // 2026-09-19 추가: 역지오코딩이 못 미덥다는 피드백 → 날짜 구간으로 도시를 한 번에 확정 지정하는 도구.
-  // "9/9일까지 런던, 9/13일까지 바르셀로나..." 처럼 실제 일정 순서를 그대로 적으면 그 구간의 지출 city를
-  // 일괄로 덮어써서, 자동 인식이 실패해도(또는 잘못 찾아도) 확실하게 도시가 반영되게 한다.
-  let cityRangeEditorOpen = false;
-  let cityRangeDraftText = null; // null이면 아래 기본 제안값을 보여줌 — 사용자가 고치면 그 값을 기억해둠
-  const CITY_RANGE_DEFAULT_TEXT = '09-09|런던\n09-13|바르셀로나\n09-15|그라나다\n09-19|세비야';
 
   function teardownRecapMap(){
     if(rcMap){ try{ rcMap.remove(); }catch(err){} rcMap = null; }
@@ -3198,154 +3273,10 @@
     });
   }
 
-  // 2026-09-19 추가: "도시별" 탭에서 city 칸을 직접 안 적어도 자동으로 도시를 구분할 수 있게,
-  // 지출의 구글지도 주소(placeAddr)에서 뽑아낸 좌표를 기준으로 역지오코딩(OpenStreetMap Nominatim)해서
-  // 도시명을 얻어온다. 결과는 data.placeCityCache에 좌표 단위로 캐싱해서 같은 곳을 다시 호출하지 않는다.
-  function cityCacheKey(lat, lng){
-    return `${lat.toFixed(2)},${lng.toFixed(2)}`; // 약 1km 격자 — 같은 동네면 API를 다시 안 불러도 되게
-  }
-  function getExpenseCoord(e){
-    if(!e.placeAddr) return null;
-    const direct = extractLatLngFromAddr(e.placeAddr);
-    if(direct) return direct;
-    const cached = data.placeAddrCoords[e.placeAddr];
-    if(cached && cached.lat != null) return { lat: cached.lat, lng: cached.lng };
-    return null;
-  }
-  // 도시 결정 우선순위: ①직접 입력한 city 칸 ②주소 좌표로 역지오코딩해서 캐시해둔 도시명 ③(둘 다 없으면) null → "기타"로 표시
+  // 2026-09-19 수정: 도시는 이제 지출 추가/수정 화면에서 직접 선택(드롭다운)하므로 e.city를 그대로 쓴다.
+  // (예전엔 주소 좌표를 역지오코딩해서 자동으로 추정했으나, 정확도가 낮아 국가별 목록 선택 방식으로 대체했다.)
   function getCityForExpense(e){
-    if(e.city && e.city.trim()) return e.city.trim();
-    const coord = getExpenseCoord(e);
-    if(!coord) return null;
-    const cached = data.placeCityCache[cityCacheKey(coord.lat, coord.lng)];
-    return cached || null;
-  }
-  // 2026-09-19 수정: 브라우저에서 곧바로 Nominatim을 호출하면(특히 짧은 시간에 여러 곳을 몰아서 조회할 때)
-  // 신원을 알 수 없는 요청으로 취급되어 조용히 막히는 경우가 많아, 대부분 "기타"로만 남는 문제가 있었다.
-  // 그래서 이미 좌표 풀이(resolveMapUrl)에 쓰고 있는 것과 같은 Apps Script 백엔드에 우선 맡긴다 — 서버가
-  // 앱을 식별하는 헤더를 붙여 Nominatim을 대신 호출해주므로 훨씬 안정적이다. Apps Script 주소가
-  // 설정 안 돼 있거나 서버 호출이 실패하면, 예전처럼 브라우저에서 직접 호출하는 방식으로 대체한다.
-  function cityFromNominatimAddress(addr){
-    addr = addr || {};
-    return addr.city || addr.town || addr.village || addr.municipality || addr.city_district
-      || addr.county || addr.state_district || addr.state || null;
-  }
-  // via: 'backend'(Apps Script 경유 성공) | 'direct'(브라우저 직접 호출 성공) | 'fail'(둘 다 실패)
-  // — 화면에는 안 보이지만 콘솔·토스트 집계로 남겨서, "왜 안 되는지" 다음에 또 헤매지 않게 한다.
-  async function reverseGeocodeCity(lat, lng){
-    const backendUrl = data.settings.driveUrl;
-    if(backendUrl){
-      try{
-        const res = await fetch(`${backendUrl}?action=resolveCity&lat=${lat}&lng=${lng}`, { method:'GET' });
-        const json = await res.json();
-        if(json && json.ok) return { ok: true, city: json.city || null, via: 'backend' };
-        console.warn('reverseGeocodeCity(Apps Script) 응답이 ok:true가 아님 — code.gs가 최신 버전으로 재배포됐는지 확인 필요', lat, lng, json);
-      }catch(err){
-        console.warn('reverseGeocodeCity(Apps Script) 호출 실패, 직접 호출로 대체', lat, lng, err);
-      }
-    }
-    try{
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=ko`, {
-        headers: { 'Accept': 'application/json' }
-      });
-      if(!res.ok){
-        console.warn('reverseGeocodeCity(직접 호출) HTTP 오류', lat, lng, res.status);
-        return { ok: false, via: 'fail' };
-      }
-      const json = await res.json();
-      return { ok: true, city: cityFromNominatimAddress(json && json.address), via: 'direct' };
-    }catch(err){
-      console.warn('reverseGeocodeCity(직접 호출) 실패', lat, lng, err);
-      return { ok: false, via: 'fail' }; // 네트워크 실패는 캐시하지 않고 다음에 다시 시도
-    }
-  }
-  let resolvingCities = false;
-  async function resolveAllTripCities(){
-    if(resolvingCities) return;
-    const trip = currentTrip();
-    const list = tripExpenses(trip.id);
-    const targets = new Map(); // cacheKey -> {lat,lng}
-    list.forEach(e => {
-      if(isKoreaCountryName(e.country)) return;
-      if(e.city && e.city.trim()) return;
-      const coord = getExpenseCoord(e);
-      if(!coord) return;
-      const key = cityCacheKey(coord.lat, coord.lng);
-      if(data.placeCityCache[key]) return; // 이미 도시명을 찾아서 캐시된 좌표만 건너뜀 — "못 찾음"은 캐시하지 않아 매번 다시 시도함
-      targets.set(key, coord);
-    });
-    if(!targets.size) return;
-
-    resolvingCities = true;
-    renderRecap();
-    let found = 0;
-    const viaCounts = { backend: 0, direct: 0, fail: 0 };
-    for(const [key, coord] of targets){
-      const result = await reverseGeocodeCity(coord.lat, coord.lng);
-      viaCounts[result.via || 'fail']++;
-      // 2026-09-19 수정: 도시를 못 찾은 경우(city:null)는 캐시에 쓰지 않는다 — 예전엔 "시도했지만 못 찾음"도
-      // null로 캐시해서 다음부터 영영 재시도가 안 됐는데(그 사이 Nominatim이 막혀서 대부분 null로 잘못
-      // 저장된 게 원인이었음), 이제는 실제로 도시명을 찾았을 때만 저장하고 그 외에는 항상 다시 시도한다.
-      if(result.ok && result.city){
-        data.placeCityCache[key] = result.city;
-        found++;
-      }
-      await new Promise(r => setTimeout(r, 1100)); // Nominatim 사용정책: 초당 1건 제한 준수
-    }
-    resolvingCities = false;
-    saveData(data);
-    renderRecap();
-    // 경로별 집계를 콘솔에 남겨서, 다음에 또 "기타"로만 빠지면 Apps Script가 제대로 쓰이고 있는지
-    // (backend 0건이면 code.gs 재배포부터 확인) 바로 알 수 있게 한다.
-    console.info('도시 자동 인식 결과', { 시도: targets.size, 새로찾음: found, 경로별: viaCounts });
-    showToast(`${targets.size}곳 중 ${found}곳의 도시를 새로 찾았어요${viaCounts.backend === 0 && data.settings.driveUrl ? ' (Apps Script 응답 없음 — code.gs 재배포를 확인해주세요)' : ''}`);
-  }
-
-  function addDaysToDateStr(dateStr, days){
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
-  }
-
-  // 구간별 도시 일괄 지정 — 줄마다 "그 도시에 머문 마지막 날짜 | 도시명"을 순서대로 받아서,
-  // 여행 시작일부터 첫 줄 날짜까지는 첫 도시, 그다음 구간은 이전 구간이 끝난 다음날부터 그 줄 날짜까지로
-  // 계산해 해당 기간의 모든 지출(한국 제외)에 city를 그 도시명으로 덮어쓴다. 역지오코딩과 달리 100% 확실하다.
-  function parseCityRangeLines(rawText, tripStartDate){
-    const year = tripStartDate.slice(0, 4);
-    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-    const ranges = [];
-    for(const line of lines){
-      const m = line.match(/^(\d{1,2})[\/\-](\d{1,2})\s*[|,\t]\s*(.+)$/);
-      if(!m) return { error: `형식을 확인해주세요: "${line}" (예: 09-09|런던)` };
-      const mm = m[1].padStart(2, '0'), dd = m[2].padStart(2, '0');
-      ranges.push({ end: `${year}-${mm}-${dd}`, city: m[3].trim() });
-    }
-    if(!ranges.length) return { error: '한 줄 이상 입력해주세요 (예: 09-09|런던)' };
-    ranges.sort((a, b) => a.end.localeCompare(b.end));
-    return { ranges };
-  }
-  function applyCityRanges(rawText){
-    const trip = currentTrip();
-    if(!trip.startDate){ showToast('먼저 설정에서 이 여행의 시작일을 입력해주세요'); return; }
-    const parsed = parseCityRangeLines(rawText, trip.startDate);
-    if(parsed.error){ showToast(parsed.error); return; }
-    let rangeStart = trip.startDate;
-    const list = tripExpenses(trip.id);
-    let changed = 0;
-    parsed.ranges.forEach(r => {
-      list.forEach(e => {
-        if(isKoreaCountryName(e.country)) return;
-        if(e.date >= rangeStart && e.date <= r.end && e.city !== r.city){
-          e.city = r.city;
-          changed++;
-        }
-      });
-      rangeStart = addDaysToDateStr(r.end, 1);
-    });
-    saveData(data);
-    render();
-    if(el('recapTabPanel').style.display !== 'none') renderRecap();
-    showToast(changed ? `${changed}건의 지출에 도시 정보를 적용했어요` : '변경된 지출이 없어요(이미 다 맞게 적용돼 있어요)');
+    return (e.city && e.city.trim()) ? e.city.trim() : null;
   }
 
   // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
@@ -3673,32 +3604,6 @@
       unresolvedAddrs.add(e.placeAddr);
     });
 
-    // "도시별" 탭에서 city 칸도 안 적었고 아직 역지오코딩도 안 해본 좌표 개수 — 기존에 입력해둔 지출도
-    // 포함해서, 버튼을 따로 누를 필요 없이 "도시별" 탭을 열면 자동으로 채워진다(아래 post-render 부분 참고).
-    const unresolvedCityCoords = new Set();
-    sortedList.forEach(e => {
-      if(isKoreaCountryName(e.country) || (e.city && e.city.trim())) return;
-      const coord = getExpenseCoord(e);
-      if(!coord) return;
-      const key = cityCacheKey(coord.lat, coord.lng);
-      if(data.placeCityCache[key]) return; // 도시명을 찾은 좌표만 "해결됨"으로 봄 — null 캐시는 없음(위 resolveAllTripCities 참고)
-      unresolvedCityCoords.add(key);
-    });
-    const resolveCitiesBtnHtml = resolvingCities
-      ? `<p class="rc-hint">🏙 주소를 기반으로 도시를 자동 인식하는 중이에요...</p>`
-      : '';
-    const cityRangeTextValue = cityRangeDraftText !== null ? cityRangeDraftText : CITY_RANGE_DEFAULT_TEXT;
-    const cityRangeToolHtml = `
-      <div class="rc-cityrange-tool">
-        <button type="button" class="toolbtn" id="cityRangeToggleBtn" style="width:100%; justify-content:center; margin-bottom:${cityRangeEditorOpen ? '10px' : '14px'};">📅 구간별로 도시 일괄 지정${cityRangeEditorOpen ? ' 닫기 ▴' : ' ▾'}</button>
-        ${cityRangeEditorOpen ? `
-        <div class="rc-cityrange-panel">
-          <p class="note">한 줄에 "그 도시에 머문 마지막 날짜 | 도시명" 순서로 적어주세요. 여행 시작일부터 첫 줄 날짜까지가 첫 구간, 그다음은 이전 구간 다음날부터 그 줄 날짜까지예요. 역지오코딩보다 확실하게 반영돼요.</p>
-          <textarea id="cityRangeInput" rows="5">${escapeHtml(cityRangeTextValue)}</textarea>
-          <button type="button" class="addbtn" id="cityRangeApplyBtn" style="width:100%; margin-top:8px;">일괄 적용</button>
-        </div>` : ''}
-      </div>`;
-
     const hintText = usingRealMap
       ? `실제 좌표 기반 지도예요${tlData && tlData.visits ? ` (구글 타임라인 GPS ${tlData.visits.length}곳 포함)` : ''}.${showLeafletMap ? ' 지도를 드래그·확대하거나 핀을 눌러보세요.' : ' 핀이나 아래 칩을 눌러보세요.'}`
       : '아직 정확한 좌표가 없어 국가가 바뀐 순서로 보여드려요. 핀이나 아래 칩을 눌러보세요.';
@@ -3785,7 +3690,7 @@
     if(recapView === 'mini'){
       viewBodyHtml = renderRecapMiniHtml(realPoints, countryOrder, usingRealMap);
     } else if(recapView === 'cities'){
-      viewBodyHtml = resolveCitiesBtnHtml + cityRangeToolHtml + renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
+      viewBodyHtml = renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
     } else {
       viewBodyHtml = `
         <p class="rc-hint">${hintText}</p>
@@ -3818,12 +3723,6 @@
       recapSelectCountry(countryOrder[countryOrder.length-1]);
     }
 
-    // "도시별" 탭을 보고 있고 아직 자동 인식 안 된 주소가 있으면, 버튼 클릭 없이 자동으로 도시를 찾아온다
-    // (기존에 이미 입력해둔 지출도 포함). setTimeout으로 한 틱 미뤄서 이 renderRecap() 호출 자체가
-    // 다 끝난 뒤에 시작하게 한다(그래야 resolveAllTripCities 안의 renderRecap() 재호출과 안 겹침).
-    if(recapView === 'cities' && unresolvedCityCoords.size && !resolvingCities){
-      setTimeout(() => resolveAllTripCities(), 0);
-    }
   }
 
   el('recapTabPanel').addEventListener('click', e => {
@@ -3831,8 +3730,6 @@
     if(subtabBtn){ recapView = subtabBtn.dataset.recapView; renderRecap(); return; }
     if(e.target.closest('#timelineUploadBtn')){ const fi = el('timelineUploadFile'); if(fi) fi.click(); return; }
     if(e.target.closest('#resolveCoordsBtn')){ resolveAllTripAddrCoords(); return; }
-    if(e.target.closest('#cityRangeToggleBtn')){ cityRangeEditorOpen = !cityRangeEditorOpen; renderRecap(); return; }
-    if(e.target.closest('#cityRangeApplyBtn')){ const ta = el('cityRangeInput'); if(ta) applyCityRanges(ta.value); return; }
     if(e.target.closest('.toolbtn') || e.target.closest('.miniicon')) return;
     const target = e.target.closest('.rc-pin, .rc-chip');
     if(target) recapSelectCountry(target.dataset.country);
@@ -3843,9 +3740,6 @@
       handleTimelineUpload(file);
       e.target.value = '';
     }
-  });
-  el('recapTabPanel').addEventListener('input', e => {
-    if(e.target.id === 'cityRangeInput'){ cityRangeDraftText = e.target.value; }
   });
 
   // 2026-09-18 추가: 구글 타임라인(위치기록) 내보내기 JSON(semanticSegments 형식)을 읽어, 이 여행 기간에
@@ -4159,6 +4053,7 @@
     if(!name) return;
     if(data.countries.includes(name)){ showToast('이미 있는 국가입니다'); return; }
     data.countries.push(name);
+    data.citiesByCountry[name] = [];
     saveData(data); input.value=''; render();
     showToast(`'${name}' 국가가 추가되었습니다`);
   });
@@ -4169,13 +4064,59 @@
       if(newName) renameListValue(data.countries, renameName, newName, (oldN, newN) => {
         data.expenses.forEach(exp => { if(exp.country === oldN) exp.country = newN; });
         if(filterCountries.has(oldN)){ filterCountries.delete(oldN); filterCountries.add(newN); }
+        // 국가 이름이 바뀌면 그 국가에 등록해둔 도시 목록도 새 이름으로 그대로 옮겨준다
+        data.citiesByCountry[newN] = data.citiesByCountry[oldN] || [];
+        delete data.citiesByCountry[oldN];
       });
       return;
     }
     const name = e.target.dataset.removeCountry;
     if(!name) return;
     data.countries = data.countries.filter(c=>c!==name);
+    delete data.citiesByCountry[name];
     saveData(data); render();
+  });
+  // 2026-09-19 추가: 설정 "도시 관리" — 국가마다 있는 입력창/버튼이 다 같은 id 없이 동적으로 생기므로
+  // 패널 전체에 이벤트 위임을 건다(data-city-country로 어느 국가에 속한 조작인지 구분).
+  function addCityToCountry(country, rawName){
+    const name = (rawName || '').trim();
+    if(!name) return false;
+    if(!Array.isArray(data.citiesByCountry[country])) data.citiesByCountry[country] = [];
+    if(data.citiesByCountry[country].includes(name)){ showToast('이미 있는 도시입니다'); return false; }
+    data.citiesByCountry[country].push(name);
+    saveData(data); render();
+    showToast(`'${name}' 도시가 추가되었습니다`);
+    return true;
+  }
+  el('cityManagePanel').addEventListener('click', e => {
+    const addBtnCountry = e.target.dataset.addCityBtn;
+    if(addBtnCountry){
+      const input = e.target.closest('.addchip').querySelector('[data-new-city-input]');
+      if(addCityToCountry(addBtnCountry, input.value)) input.value = '';
+      return;
+    }
+    const renameCountry = e.target.dataset.cityCountry;
+    const renameName = e.target.dataset.renameCity;
+    if(renameCountry && renameName){
+      const newName = promptRename(renameName, '도시');
+      if(newName) renameListValue(data.citiesByCountry[renameCountry], renameName, newName, (oldN, newN) => {
+        data.expenses.forEach(exp => { if(exp.country === renameCountry && exp.city === oldN) exp.city = newN; });
+      });
+      return;
+    }
+    const removeCountry = e.target.dataset.cityCountry;
+    const removeName = e.target.dataset.removeCity;
+    if(removeCountry && removeName){
+      data.citiesByCountry[removeCountry] = (data.citiesByCountry[removeCountry] || []).filter(c => c !== removeName);
+      saveData(data); render();
+    }
+  });
+  el('cityManagePanel').addEventListener('keydown', e => {
+    if(e.key === 'Enter' && e.target.matches('[data-new-city-input]')){
+      e.preventDefault();
+      const country = e.target.dataset.newCityInput;
+      if(addCityToCountry(country, e.target.value)) e.target.value = '';
+    }
   });
   el('addCurrencyBtn').addEventListener('click', () => {
     const input = el('newCurrencyInput');
