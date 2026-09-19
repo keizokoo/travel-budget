@@ -986,8 +986,10 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-05';
+  const APP_BUILD = '2026-09-19-07';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '"도시별" 자동 인식이 계속 "기타"에서 안 바뀌던 문제의 진짜 원인을 찾아 수정 — Apps Script 백엔드로 안정성을 높인 지난 수정 이전에, 대부분의 좌표가 "시도했지만 못 찾음(null)"으로 이미 캐시돼 있었는데, 그 캐시가 있으면 무조건 "이미 시도해봄"으로 보고 다시는 재시도를 안 하던 버그가 있었음(백엔드가 아무리 좋아져도 이미 null로 저장된 좌표는 영영 그대로 남는 구조였음). 이제는 실제로 도시명을 찾았을 때만 캐시하고, 못 찾은 좌표는 캐시하지 않아 "도시별" 탭을 열 때마다 항상 다시 시도함 — 기존에 잘못 저장된 null 캐시도 자동으로 다시 풀림. 인식 결과 토스트에 Apps Script 응답이 없었는지도 함께 표시해서(예: "code.gs 재배포를 확인해주세요") 원인을 바로 알 수 있게 함.' },
+    { date: '2026-09-19', note: '"도시별" 자동 도시 인식이 대부분 "기타"로만 빠지던 문제 개선 — 브라우저가 Nominatim(OpenStreetMap 역지오코딩)을 직접 호출하면 앱을 식별할 방법이 마땅치 않아 조용히 막히는 경우가 많았는데, 이미 구글지도 짧은 링크 풀이에 쓰고 있는 Apps Script 백엔드를 거치도록 바꿔 훨씬 안정적으로 도시를 찾아오게 함(설정에 Google Drive 자동 백업 URL이 등록돼 있어야 하며, code.gs를 최신 버전으로 다시 배포해야 적용됨). 미설정 시에는 예전처럼 브라우저 직접 호출로 자동 대체.' },
     { date: '2026-09-19', note: '"도시별" 탭 도시 자동 인식을 버튼 클릭 없이 자동 실행으로 변경 — 탭을 열면 기존에 이미 입력해둔 지출까지 포함해 바로 주소 기반으로 도시를 채움. 상단 요약을 "방문 도시/방문 장소/전체 여행"에서 "방문 국가/방문 도시/방문 장소"로 바꾸고, 그 아래에 국가별 방문 도시 수(예: 🇬🇧 영국 1곳 · 🇪🇸 스페인 2곳)를 추가로 표시.' },
     { date: '2026-09-19', note: '"도시별" 탭에서 city 칸을 직접 안 적은 지출도 자동으로 도시가 구분되게 개선 — 구글지도 주소의 좌표를 OpenStreetMap 역지오코딩으로 조회해서 도시명을 알아냄. "🏙 주소 N곳 도시 자동 인식하기" 버튼을 누르면 아직 못 찾은 좌표들만 순서대로 조회해 캐시해두고(같은 곳은 다시 안 부름), 이후부터는 city를 안 적어도 그 도시 카드 밑으로 자동 분류됨(끝까지 못 찾은 경우만 "기타"로 남음).' },
     { date: '2026-09-19', note: '"여행기록"(지도/미니맵/도시별)에서 출발지인 한국을 완전히 제외 — 인천공항 등 출국일 GPS 기록이나 "한국"으로 표기된 지출은 지리적 좌표 기준으로 걸러내서(주소를 지워도 GPS 타임라인에 남아있던 문제까지 함께 해결) 더 이상 지도·국가 목록·도시별 목록에 나타나지 않음(지출 합계·전체 여행일수는 원래대로 전체 트립 기준 유지). 결제수단(현금/카드) 구분 기능을 전체 삭제 — "결제수단별 지출 비중" 패널, 지출 추가/수정 화면의 현금·카드 선택, 설정의 "카드 구분 관리"를 모두 제거. "카테고리별 비중"·"국가별 지출 비교" 그래프를 누르면 그 자리에서 상세 내역(날짜·항목·금액)이 펼쳐지고, "지출내역에서 필터로 보기" 버튼으로 바로 그 카테고리/국가만 필터링된 지출내역으로 이동 가능. "도시별" 탭을 국가 → 도시 2단계 구조로 변경 — 국가별로 묶은 뒤 그 아래에 도시 구분자를 두고(도시를 안 적은 지출은 "기타"로) 방문 장소를 나열.' },
@@ -3204,18 +3206,43 @@
     const cached = data.placeCityCache[cityCacheKey(coord.lat, coord.lng)];
     return cached || null;
   }
+  // 2026-09-19 수정: 브라우저에서 곧바로 Nominatim을 호출하면(특히 짧은 시간에 여러 곳을 몰아서 조회할 때)
+  // 신원을 알 수 없는 요청으로 취급되어 조용히 막히는 경우가 많아, 대부분 "기타"로만 남는 문제가 있었다.
+  // 그래서 이미 좌표 풀이(resolveMapUrl)에 쓰고 있는 것과 같은 Apps Script 백엔드에 우선 맡긴다 — 서버가
+  // 앱을 식별하는 헤더를 붙여 Nominatim을 대신 호출해주므로 훨씬 안정적이다. Apps Script 주소가
+  // 설정 안 돼 있거나 서버 호출이 실패하면, 예전처럼 브라우저에서 직접 호출하는 방식으로 대체한다.
+  function cityFromNominatimAddress(addr){
+    addr = addr || {};
+    return addr.city || addr.town || addr.village || addr.municipality || addr.city_district
+      || addr.county || addr.state_district || addr.state || null;
+  }
+  // via: 'backend'(Apps Script 경유 성공) | 'direct'(브라우저 직접 호출 성공) | 'fail'(둘 다 실패)
+  // — 화면에는 안 보이지만 콘솔·토스트 집계로 남겨서, "왜 안 되는지" 다음에 또 헤매지 않게 한다.
   async function reverseGeocodeCity(lat, lng){
+    const backendUrl = data.settings.driveUrl;
+    if(backendUrl){
+      try{
+        const res = await fetch(`${backendUrl}?action=resolveCity&lat=${lat}&lng=${lng}`, { method:'GET' });
+        const json = await res.json();
+        if(json && json.ok) return { ok: true, city: json.city || null, via: 'backend' };
+        console.warn('reverseGeocodeCity(Apps Script) 응답이 ok:true가 아님 — code.gs가 최신 버전으로 재배포됐는지 확인 필요', lat, lng, json);
+      }catch(err){
+        console.warn('reverseGeocodeCity(Apps Script) 호출 실패, 직접 호출로 대체', lat, lng, err);
+      }
+    }
     try{
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=10&accept-language=ko`, {
         headers: { 'Accept': 'application/json' }
       });
+      if(!res.ok){
+        console.warn('reverseGeocodeCity(직접 호출) HTTP 오류', lat, lng, res.status);
+        return { ok: false, via: 'fail' };
+      }
       const json = await res.json();
-      const addr = (json && json.address) || {};
-      const city = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district || addr.state || null;
-      return { ok: true, city };
+      return { ok: true, city: cityFromNominatimAddress(json && json.address), via: 'direct' };
     }catch(err){
-      console.warn('reverseGeocodeCity 실패', lat, lng, err);
-      return { ok: false }; // 네트워크 실패는 캐시하지 않고 다음에 다시 시도
+      console.warn('reverseGeocodeCity(직접 호출) 실패', lat, lng, err);
+      return { ok: false, via: 'fail' }; // 네트워크 실패는 캐시하지 않고 다음에 다시 시도
     }
   }
   let resolvingCities = false;
@@ -3230,7 +3257,7 @@
       const coord = getExpenseCoord(e);
       if(!coord) return;
       const key = cityCacheKey(coord.lat, coord.lng);
-      if(Object.prototype.hasOwnProperty.call(data.placeCityCache, key)) return; // 이미 시도해서 캐시됨(null 포함)
+      if(data.placeCityCache[key]) return; // 이미 도시명을 찾아서 캐시된 좌표만 건너뜀 — "못 찾음"은 캐시하지 않아 매번 다시 시도함
       targets.set(key, coord);
     });
     if(!targets.size) return;
@@ -3238,18 +3265,26 @@
     resolvingCities = true;
     renderRecap();
     let found = 0;
+    const viaCounts = { backend: 0, direct: 0, fail: 0 };
     for(const [key, coord] of targets){
       const result = await reverseGeocodeCity(coord.lat, coord.lng);
-      if(result.ok){
+      viaCounts[result.via || 'fail']++;
+      // 2026-09-19 수정: 도시를 못 찾은 경우(city:null)는 캐시에 쓰지 않는다 — 예전엔 "시도했지만 못 찾음"도
+      // null로 캐시해서 다음부터 영영 재시도가 안 됐는데(그 사이 Nominatim이 막혀서 대부분 null로 잘못
+      // 저장된 게 원인이었음), 이제는 실제로 도시명을 찾았을 때만 저장하고 그 외에는 항상 다시 시도한다.
+      if(result.ok && result.city){
         data.placeCityCache[key] = result.city;
-        if(result.city) found++;
+        found++;
       }
       await new Promise(r => setTimeout(r, 1100)); // Nominatim 사용정책: 초당 1건 제한 준수
     }
     resolvingCities = false;
     saveData(data);
     renderRecap();
-    showToast(`${targets.size}곳 중 ${found}곳의 도시를 새로 찾았어요`);
+    // 경로별 집계를 콘솔에 남겨서, 다음에 또 "기타"로만 빠지면 Apps Script가 제대로 쓰이고 있는지
+    // (backend 0건이면 code.gs 재배포부터 확인) 바로 알 수 있게 한다.
+    console.info('도시 자동 인식 결과', { 시도: targets.size, 새로찾음: found, 경로별: viaCounts });
+    showToast(`${targets.size}곳 중 ${found}곳의 도시를 새로 찾았어요${viaCounts.backend === 0 && data.settings.driveUrl ? ' (Apps Script 응답 없음 — code.gs 재배포를 확인해주세요)' : ''}`);
   }
 
   // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
@@ -3585,7 +3620,7 @@
       const coord = getExpenseCoord(e);
       if(!coord) return;
       const key = cityCacheKey(coord.lat, coord.lng);
-      if(Object.prototype.hasOwnProperty.call(data.placeCityCache, key)) return;
+      if(data.placeCityCache[key]) return; // 도시명을 찾은 좌표만 "해결됨"으로 봄 — null 캐시는 없음(위 resolveAllTripCities 참고)
       unresolvedCityCoords.add(key);
     });
     const resolveCitiesBtnHtml = resolvingCities
