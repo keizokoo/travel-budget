@@ -138,7 +138,11 @@
   .rc-city-catcaption{ display:flex; flex-wrap:wrap; gap:8px; font-size:10px; color:var(--ink2); font-weight:700; }
   .rc-city-catcaption i{ width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:3px; vertical-align:middle; }
   .rc-city-tags{ display:flex; flex-wrap:wrap; gap:5px; }
-  .rc-city-tag{ font-size:10px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 8px; border-radius:20px; }
+  .rc-city-tag{ font-size:10px; font-weight:700; color:var(--ink2); background:var(--bg); padding:3px 8px; border-radius:20px; cursor:pointer; }
+  .rc-city-tag:hover{ background:var(--line); }
+  .rc-city-card-missing{ border-color:var(--warn); }
+  .rc-missing-hint{ font-size:11px; font-weight:700; color:var(--warn); margin:0; }
+  .rc-city-card-missing .rc-city-tag{ color:var(--warn); border:1px solid var(--warn); background:var(--bg); }
   .rc-city-foot{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
   .rc-city-foot .n{ font-weight:800; color:var(--ink); font-size:13.5px; white-space:nowrap; }
   .rc-city-foot .n small{ color:var(--ink2); font-size:10.5px; font-weight:700; margin-left:3px; }
@@ -521,6 +525,24 @@
   .modal.show{ display:block; opacity:1; transform:translate(-50%,-50%) scale(1); }
   .modal img{ width:100%; border-radius:10px; display:block; margin-bottom:10px; }
   .modal .closebtn{ float:right; background:none; border:none; font-size:18px; color:var(--ink2); }
+
+  /* 2026-09-19 추가: "도시별" 태그를 눌렀을 때 뜨는 지출 상세 팝업 — 주소가 없는 지출도 다 보이게 하고,
+     도시가 비어있으면 그 자리에서 바로 지정할 수 있게 한다. */
+  .expinfo-card{ padding:12px 0; border-bottom:1px solid var(--line); }
+  .expinfo-card:first-child{ padding-top:4px; }
+  .expinfo-card:last-child{ border-bottom:none; padding-bottom:0; }
+  .expinfo-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .expinfo-item{ font-weight:800; font-size:14px; }
+  .expinfo-amt{ font-weight:800; font-size:13.5px; color:var(--ink); white-space:nowrap; }
+  .expinfo-meta{ font-size:11.5px; color:var(--ink2); display:flex; flex-wrap:wrap; gap:6px 10px; margin-bottom:6px; }
+  .expinfo-memo{ font-size:12px; color:var(--ink2); margin-bottom:6px; }
+  .expinfo-maplink{
+    display:inline-flex; align-items:center; gap:4px; text-decoration:none; font-size:12px; font-weight:700;
+    color:var(--good); background:var(--surface); border:1px solid var(--good); border-radius:999px; padding:3px 10px 3px 8px; margin-bottom:6px;
+  }
+  .expinfo-assign{ background:var(--surface); border:1px solid var(--warn); border-radius:10px; padding:10px; margin-top:6px; }
+  .expinfo-assign p{ margin:0 0 6px; font-size:11.5px; font-weight:700; color:var(--warn); }
+  .expinfo-assign select{ width:100%; border:1px solid var(--line2); border-radius:8px; padding:7px 8px; font-size:12.5px; background:var(--bg); color:var(--ink); }
 
   .erow-check{ width:17px; height:17px; flex-shrink:0; accent-color:var(--accent); }
   .erow .row1.rowcheck-on{ padding-left:2px; }
@@ -923,6 +945,12 @@
   </div>
 </div>
 
+<div class="overlay" id="expenseInfoOverlay"></div>
+<div class="modal" id="expenseInfoModal">
+  <button class="closebtn" id="expenseInfoClose">✕</button>
+  <div id="expenseInfoBody"></div>
+</div>
+
 <div class="overlay" id="photoOverlay"></div>
 <div class="modal" id="photoModal">
   <button class="closebtn" id="photoClose">✕</button>
@@ -997,8 +1025,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-09';
+  const APP_BUILD = '2026-09-19-10';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '여행기록 상단 요약 카드 3번째 칸을 "전체 지출"에서 "방문 도시"(국가+도시 조합 개수)로 교체(지출 총액은 지출내역 탭에 이미 있어 중복 제거). "도시별" 탭 개선 4가지 — ① 같은 날 안에서 여러 도시를 방문했을 때 지출 입력 순서가 아니라 시각(입력 안 한 지출은 00:00 취급) 기준으로 정렬되도록 고쳐서, 스페인처럼 같은 날 이동이 겹치는 경우에도 실제 방문 순서대로 도시가 나열됨(그래도 순서가 이상하면 그 지출의 날짜 자체가 잘못 입력됐을 가능성이 크니 지출내역에서 확인 필요). ② 도시 카드에 "Day N" 대신 실제 달력 날짜(예: 9/10 – 9/13) 체류 기간 표시 추가. ③ 상호명·주소가 없는 지출도 태그로 빠짐없이 표시되도록 바꿈(전엔 주소/상호명 있는 지출만 보였음) — 태그를 누르면 그 지출 상세 팝업이 뜨고, 지도 링크·메모까지 확인 가능. ④ 도시를 지정 안 한 지출("기타")은 카드에 경고 문구와 함께 몇 건인지 표시되고, 태그를 눌러 뜨는 팝업 안에서 그 자리에서 바로 도시를 골라 지정할 수 있음(구글지도 주소가 있으면 팝업에 그대로 보여줘서 어디였는지 확인하며 고를 수 있음) — 영국 "기타"처럼 도시가 비어서 뭉뚱그려지던 지출들을 빠짐없이 찾아 하나씩 정리 가능. 홈 화면에 추가해 앱처럼(PWA standalone) 쓸 때 구글지도 주소 링크를 누르면 새 탭이 빈 화면/오류로 뜨던 iOS 문제 수정 — standalone 모드에서는 새 탭 대신 현재 창에서 바로 이동시켜 정상적으로 지도로 연결되게 함(적용되려면 앱을 완전히 종료 후 다시 열어야 함).' },
     { date: '2026-09-19', note: '도시 입력 방식을 전면 개편 — 자유입력 텍스트 칸을 없애고, 국가별로 등록해둔 도시 목록에서 드롭다운으로 선택하도록 바꿈. 설정에 "도시 관리" 화면을 새로 추가해 국가마다 도시를 추가·이름수정·삭제할 수 있고(카테고리/국가/통화 관리와 같은 방식), 지출 추가 화면에서도 "+ 새 도시 추가"로 바로 등록 가능. 예전엔 지출 수정 화면에 도시 입력칸 자체가 없어서 한 번 잘못 입력하거나 비워둔 도시를 고칠 방법이 없었는데, 이제 수정 화면에도 도시 드롭다운이 추가되어 언제든 바로잡을 수 있음. 기존에 자유입력으로 넣어뒀던 도시명(런던·바르셀로나 등)은 전부 자동으로 새 도시 목록에 편입되어 그대로 드롭다운에 나타남. 정확도가 낮았던 "도시별" 탭의 주소 기반 자동 인식(역지오코딩)과 "구간별 도시 일괄 지정" 도구는 이번 방식으로 대체되어 제거됨.' },
     { date: '2026-09-19', note: '"도시별" 탭에 "📅 구간별로 도시 일괄 지정" 도구 추가 — 자동 인식(역지오코딩)이 미덥지 않을 때를 위해, "09-09|런던"처럼 "그 도시에 머문 마지막 날짜 | 도시명"을 한 줄씩 적으면 여행 시작일부터 그 날짜까지(그다음 줄은 이전 구간 다음날부터) 해당하는 지출들의 도시를 한 번에 확실하게 덮어씀. 좌표 조회에 기대지 않는 방식이라 100% 정확하게 반영되고, 한국으로 표기된 지출은 자동으로 건너뜀. 입력창은 기본으로 09-09 런던, 09-13 바르셀로나, 09-15 그라나다, 09-19 세비야로 미리 채워져 있어 "일괄 적용" 한 번이면 끝.' },
     { date: '2026-09-19', note: '"도시별" 자동 인식이 계속 "기타"에서 안 바뀌던 문제의 진짜 원인을 찾아 수정 — Apps Script 백엔드로 안정성을 높인 지난 수정 이전에, 대부분의 좌표가 "시도했지만 못 찾음(null)"으로 이미 캐시돼 있었는데, 그 캐시가 있으면 무조건 "이미 시도해봄"으로 보고 다시는 재시도를 안 하던 버그가 있었음(백엔드가 아무리 좋아져도 이미 null로 저장된 좌표는 영영 그대로 남는 구조였음). 이제는 실제로 도시명을 찾았을 때만 캐시하고, 못 찾은 좌표는 캐시하지 않아 "도시별" 탭을 열 때마다 항상 다시 시도함 — 기존에 잘못 저장된 null 캐시도 자동으로 다시 풀림. 인식 결과 토스트에 Apps Script 응답이 없었는지도 함께 표시해서(예: "code.gs 재배포를 확인해주세요") 원인을 바로 알 수 있게 함.' },
@@ -2932,6 +2961,75 @@
   el('photoClose').addEventListener('click', closePhotoModal);
   el('photoOverlay').addEventListener('click', closePhotoModal);
 
+  // 2026-09-19 추가: "도시별" 탭 태그(주소가 있든 없든 모든 지출이 이제 태그로 나온다)를 누르면 뜨는
+  // 지출 상세 팝업. 도시가 비어있는 지출이면 팝업 안에서 바로 도시를 지정할 수 있게 해서, 지도 화면까지
+  // 안 가고도 "기타"로 묶인 지출들을 그 자리에서 바로 정리할 수 있다.
+  let expenseInfoOpenIds = [];
+  function expenseInfoCardHtml(e){
+    const catColor = tagColor(data.categories, e.category);
+    const fxHtml = e.currency !== 'KRW' && e.amountForeign != null
+      ? ` (${Number(e.amountForeign).toLocaleString('ko-KR')} ${e.currency})` : '';
+    const mapPlaceName = e.placeName || placeNameFromAddr(e.placeAddr);
+    const mapLinkHtml = e.placeAddr
+      ? `<a class="expinfo-maplink" href="${escapeHtml(mapUrlFor(e.placeAddr))}" target="_blank" rel="noopener">🗺 ${escapeHtml(mapPlaceName || '지도에서 보기')}</a>`
+      : '';
+    const memoHtml = e.memo ? `<div class="expinfo-memo">📝 ${escapeHtml(e.memo)}</div>` : '';
+    const cityMissing = !(e.city && e.city.trim());
+    const cityOptions = (data.citiesByCountry[e.country] || []).map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    const assignHtml = cityMissing ? `
+      <div class="expinfo-assign">
+        <p>⚠️ 이 지출의 도시가 비어있어요 — 바로 지정해주세요</p>
+        <select data-assign-city="${e.id}">
+          <option value="">도시 선택</option>
+          ${cityOptions}
+        </select>
+      </div>` : '';
+    return `<div class="expinfo-card">
+      <div class="expinfo-head">
+        <span class="expinfo-item">${escapeHtml(e.item)}</span>
+        <span class="expinfo-amt tabular">${won(e.amountKrw)}${fxHtml}</span>
+      </div>
+      <div class="expinfo-meta">
+        <span>${e.date.slice(5).replace('-','/')}${e.time ? ' · '+escapeHtml(e.time) : ''}</span>
+        <span style="color:${catColor};">${escapeHtml(e.category)}</span>
+        <span>${countryFlag(e.country)} ${escapeHtml(e.country)}${e.city ? ', '+escapeHtml(e.city) : ''}</span>
+      </div>
+      ${mapLinkHtml}
+      ${memoHtml}
+      ${assignHtml}
+    </div>`;
+  }
+  function renderExpenseInfoBody(){
+    const items = expenseInfoOpenIds.map(id => data.expenses.find(x => x.id === id)).filter(Boolean);
+    el('expenseInfoBody').innerHTML = items.length
+      ? items.map(expenseInfoCardHtml).join('')
+      : '<p class="note">삭제되었거나 찾을 수 없는 지출이에요.</p>';
+  }
+  function openExpenseInfoPopup(ids){
+    expenseInfoOpenIds = ids;
+    renderExpenseInfoBody();
+    el('expenseInfoModal').classList.add('show');
+    el('expenseInfoOverlay').classList.add('show');
+  }
+  function closeExpenseInfoPopup(){
+    el('expenseInfoModal').classList.remove('show');
+    el('expenseInfoOverlay').classList.remove('show');
+  }
+  el('expenseInfoClose').addEventListener('click', closeExpenseInfoPopup);
+  el('expenseInfoOverlay').addEventListener('click', closeExpenseInfoPopup);
+  el('expenseInfoBody').addEventListener('change', e => {
+    const id = e.target.dataset.assignCity;
+    if(!id) return;
+    const exp = data.expenses.find(x => x.id === id);
+    if(!exp) return;
+    exp.city = e.target.value;
+    saveData(data);
+    renderExpenseInfoBody();
+    render();
+    if(el('recapTabPanel').style.display !== 'none') renderRecap();
+    showToast(exp.city ? `도시가 "${exp.city}"(으)로 지정됐어요` : '도시를 비웠어요');
+  });
+
   // ---------- 일자별 메모: 수정/저장/취소 ----------
   // 편집모드에 들어가기 전까지는 day.note를 건드리지 않고, 입력 중엔 높이만 자동으로 늘려준다(저장은 명시적으로 눌러야 반영).
   el('dayGroups').addEventListener('input', e => {
@@ -3285,22 +3383,29 @@
   function cityBucketsFromList(sortedList){
     const countryGroups = {};
     const countryOrder = [];
+    // 2026-09-19 수정: 도시 정렬을 날짜만으로 비교하면, 같은 날 안에서 방문한 여러 도시(당일치기 등)의
+    // 순서가 지출을 입력한 순서(입력 순서일 뿐 실제 방문 순서와 무관)에 좌우되던 문제가 있었다. 시각(time)이
+    // 입력된 지출은 "날짜+시각"까지 비교해 같은 날 안에서도 실제 방문한 시간 순서대로 정렬되게 한다
+    // (시각을 안 적은 지출은 그날 00:00으로 취급 — 그래도 최소한 다른 날짜와는 항상 올바르게 비교됨).
+    const sortKeyOf = e => `${e.date}T${/^\d{2}:\d{2}$/.test(e.time||'') ? e.time : '00:00'}`;
     sortedList.forEach(e => {
       if(isKoreaCountryName(e.country)) return;
       if(!countryGroups[e.country]){ countryGroups[e.country] = { country: e.country, cityMap: {}, cityOrder: [] }; countryOrder.push(e.country); }
       const cg = countryGroups[e.country];
       const cityKey = getCityForExpense(e) || '기타';
-      if(!cg.cityMap[cityKey]){ cg.cityMap[cityKey] = { key: cityKey, country: e.country, days: new Set(), items: [], firstDate: e.date }; cg.cityOrder.push(cityKey); }
+      if(!cg.cityMap[cityKey]){ cg.cityMap[cityKey] = { key: cityKey, country: e.country, days: new Set(), items: [], firstDate: e.date, firstSortKey: sortKeyOf(e) }; cg.cityOrder.push(cityKey); }
       const b = cg.cityMap[cityKey];
       b.days.add(e.date);
       b.items.push(e);
       if(e.date < b.firstDate) b.firstDate = e.date;
+      const key = sortKeyOf(e);
+      if(key < b.firstSortKey) b.firstSortKey = key;
     });
     return countryOrder.map(country => {
       const cg = countryGroups[country];
       const cities = cg.cityOrder
         .slice()
-        .sort((a,b) => cg.cityMap[a].firstDate.localeCompare(cg.cityMap[b].firstDate))
+        .sort((a,b) => cg.cityMap[a].firstSortKey.localeCompare(cg.cityMap[b].firstSortKey))
         .map(k => cg.cityMap[k]);
       return { country, cities };
     });
@@ -3316,9 +3421,10 @@
 
     function cityCardHtml(b){
       const days = Array.from(b.days).sort();
-      const firstInfo = dayInfo(trip, days[0]);
-      const lastInfo = dayInfo(trip, days[days.length-1]);
-      const rangeLabel = days.length > 1 ? `${firstInfo.label} – ${lastInfo.label}` : `${firstInfo.label} 당일`;
+      // 2026-09-19 수정: "Day 3 – Day 5"처럼 여행일차로만 보여주던 걸 실제 달력 날짜(9/10 – 9/13)로 바꿔서
+      // 체류 기간이 한눈에 보이게 함(여행일차는 아래 daybar 막대로 이미 감을 잡을 수 있어 중복 표기 안 함).
+      const shortDate = d => d.slice(5).replace('-','/');
+      const rangeLabel = days.length > 1 ? `${shortDate(days[0])} – ${shortDate(days[days.length-1])}` : `${shortDate(days[0])} 당일`;
 
       let daybarHtml = '';
       if(tripSpanMs > 0){
@@ -3334,13 +3440,17 @@
       // 2026-09-19 수정: "얼마 썼는지"가 아니라 "어딜 갔는지"가 주인공이 되도록 — 카테고리 비중은
       // 금액이 아니라 "방문 장소 수" 기준으로 바꾸고, 장소 태그는 다 잘리지 않게 전부 보여주고,
       // 카드 하단의 지출 총액은 뺐다(금액은 지출내역 탭에 이미 있음).
+      // 2026-09-19 재수정: 주소·상호명이 없는 지출은 예전엔 태그 목록에서 통째로 빠져서 "지도가 있는
+      // 이력만 보인다"는 문제가 있었다 — 이제는 상호명/주소가 없으면 지출 항목명(item)으로 태그를 만들어
+      // 빠짐없이 다 보여주고, 태그마다 관련 지출 id를 담아둬서 눌렀을 때 상세 팝업을 띄울 수 있게 한다.
       const placeOrder = [];
       const seenPlace = new Set();
       const placeCat = {};
+      const placeIds = {};
       b.items.forEach(e => {
-        if(!e.placeName && !e.placeAddr) return;
         const name = e.placeName || placeNameFromAddr(e.placeAddr) || e.item;
-        if(!seenPlace.has(name)){ seenPlace.add(name); placeOrder.push(name); placeCat[name] = e.category; }
+        if(!seenPlace.has(name)){ seenPlace.add(name); placeOrder.push(name); placeCat[name] = e.category; placeIds[name] = []; }
+        placeIds[name].push(e.id);
       });
       const placeCount = placeOrder.length;
       totalPlaces += placeCount;
@@ -3353,11 +3463,18 @@
            <div class="rc-city-catcaption">${catEntries.map(([cat,cnt]) => `<span><i style="background:${tagColor(data.categories, cat)};"></i>${escapeHtml(cat)} ${cnt}</span>`).join('')}</div>`
         : '';
       const tagsHtml = placeOrder.length
-        ? `<div class="rc-city-tags">${placeOrder.map(n => `<span class="rc-city-tag">${escapeHtml(n)}</span>`).join('')}</div>`
+        ? `<div class="rc-city-tags">${placeOrder.map(n => `<span class="rc-city-tag" data-expense-ids="${placeIds[n].join(',')}">${escapeHtml(n)}</span>`).join('')}</div>`
         : `<div class="rc-place-row rc-place-empty" style="padding:2px 0;">등록된 장소가 없어요</div>`;
 
-      return `<div class="rc-city-card">
+      // "기타"(도시를 지정 안 한 지출) 카드는 위 태그만으로는 "채워야 할 목록"이라는 게 눈에 잘 안 띄어서,
+      // 안내 문구를 하나 더 붙인다 — 태그를 누르면 뜨는 팝업에서 바로 도시를 지정할 수 있다.
+      const missingHintHtml = b.key === '기타'
+        ? `<p class="rc-missing-hint">⚠️ 도시가 비어있는 지출 ${b.items.length}건 — 아래 항목을 눌러 도시를 지정해주세요</p>`
+        : '';
+
+      return `<div class="rc-city-card${b.key==='기타' ? ' rc-city-card-missing' : ''}">
         <div class="rc-city-head"><span class="rc-city-name">🏙 ${escapeHtml(b.key)}</span><span class="rc-city-range">${rangeLabel}</span></div>
+        ${missingHintHtml}
         ${daybarHtml}
         ${mixHtml}
         ${tagsHtml}
@@ -3481,7 +3598,6 @@
     const dateOrder = [];
     sortedList.forEach(e => { if(!dateOrder.includes(e.date)) dateOrder.push(e.date); });
 
-    const totalSpent = sortedList.reduce((s,e)=>s+e.amountKrw, 0);
     let dayCount = dateOrder.length;
     if(trip.startDate && trip.endDate){
       dayCount = Math.round((new Date(trip.endDate+'T00:00:00') - new Date(trip.startDate+'T00:00:00')) / 86400000) + 1;
@@ -3496,6 +3612,14 @@
       countryAgg[e.country].days.add(e.date);
       countryAgg[e.country].total += e.amountKrw;
       countryAgg[e.country].items.push(e);
+    });
+
+    // 2026-09-19 추가: 상단 요약 카드 3번째 칸을 "전체 지출"에서 "방문 도시"로 교체(지출 총액은 지출내역
+    // 탭에 이미 있어서 여기서는 뺌) — 국가+도시로 묶어 셈해서 나라가 달라도 같은 이름의 도시는 따로 센다.
+    const visitedCityKeys = new Set();
+    sortedList.forEach(e => {
+      if(isKoreaCountryName(e.country)) return;
+      if(e.city && e.city.trim()) visitedCityKeys.add(e.country + '|' + e.city.trim());
     });
 
     // 그 날 지출로 알 수 있는 "그 날의 대표 국가" — 구글 타임라인 GPS 기록에는 국가 정보가 없어서,
@@ -3708,7 +3832,7 @@
       <div class="rc-stats">
         <div class="rc-stat"><div class="v tabular">${dayCount}일</div><div class="l">전체 기간</div></div>
         <div class="rc-stat"><div class="v tabular">${countryOrder.length}개국</div><div class="l">${countryOrder.map(countryFlag).join('')}</div></div>
-        <div class="rc-stat"><div class="v tabular">${won(totalSpent)}</div><div class="l">전체 지출</div></div>
+        <div class="rc-stat"><div class="v tabular">${visitedCityKeys.size}</div><div class="l">방문 도시</div></div>
       </div>
 
       <div class="sectionhead"><h3>다녀온 길</h3></div>
@@ -3730,6 +3854,10 @@
     if(subtabBtn){ recapView = subtabBtn.dataset.recapView; renderRecap(); return; }
     if(e.target.closest('#timelineUploadBtn')){ const fi = el('timelineUploadFile'); if(fi) fi.click(); return; }
     if(e.target.closest('#resolveCoordsBtn')){ resolveAllTripAddrCoords(); return; }
+    // 2026-09-19 추가: 도시별 탭의 장소 태그를 누르면 관련 지출 상세 팝업을 띄운다(도시가 비어있으면
+    // 팝업 안에서 바로 도시를 지정할 수 있음). .toolbtn/.miniicon 가드보다 먼저 검사해야 함.
+    const tag = e.target.closest('.rc-city-tag[data-expense-ids]');
+    if(tag){ openExpenseInfoPopup(tag.dataset.expenseIds.split(',')); return; }
     if(e.target.closest('.toolbtn') || e.target.closest('.miniicon')) return;
     const target = e.target.closest('.rc-pin, .rc-chip');
     if(target) recapSelectCountry(target.dataset.country);
@@ -4463,6 +4591,19 @@
     el('installBtn').style.display = 'none';
   });
   window.addEventListener('appinstalled', () => { el('installBtn').style.display = 'none'; });
+  // 2026-09-19 추가: 홈 화면에 추가해서 "앱처럼"(PWA standalone) 쓸 때, target="_blank" 링크(구글지도 주소
+  // 등)가 새 탭을 열긴 열되 그 탭이 제한된 인앱 웹뷰라 구글지도 같은 외부 사이트가 빈 화면/오류로 뜨는
+  // iOS의 알려진 문제가 있음. standalone 모드에서는 새 탭 대신 현재 창에서 그대로 이동시켜서(그러면 OS가
+  // 정상적으로 지도 앱이나 사파리로 넘겨줌) 이 문제를 피한다.
+  const isStandaloneApp = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  if(isStandaloneApp){
+    document.addEventListener('click', e => {
+      const link = e.target.closest('a[target="_blank"]');
+      if(!link || !link.href) return;
+      e.preventDefault();
+      window.location.href = link.href;
+    });
+  }
   if('serviceWorker' in navigator && location.protocol !== 'file:'){
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch(() => {});
