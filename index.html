@@ -152,6 +152,13 @@
   .rc-spend b{ color:var(--ink); font-weight:700; }
   .rc-empty{ font-size:12.5px; color:var(--ink3); padding:24px 0; text-align:center; }
   .rc-hint{ font-size:11px; color:var(--ink3); margin:-6px 0 14px; }
+  .rc-cityrange-tool{ margin-bottom:4px; }
+  .rc-cityrange-panel{ background:var(--surface); border:1px solid var(--line2); border-radius:14px; padding:14px; margin-bottom:14px; }
+  .rc-cityrange-panel .note{ font-size:11.5px; color:var(--ink2); line-height:1.5; margin:0 0 10px; }
+  .rc-cityrange-panel textarea{
+    width:100%; box-sizing:border-box; border:1px solid var(--line2); border-radius:8px; padding:9px 10px;
+    font-size:12.5px; font-family:inherit; color:var(--ink); background:var(--bg); resize:vertical; line-height:1.5;
+  }
   .rc-detail-wrap{ border-top:1px solid var(--line2); padding-top:16px; }
   .rc-detail-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
   .rc-places{ display:flex; flex-direction:column; gap:2px; }
@@ -986,8 +993,9 @@
   // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
   // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
   // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-07';
+  const APP_BUILD = '2026-09-19-08';
   const CHANGELOG = [
+    { date: '2026-09-19', note: '"도시별" 탭에 "📅 구간별로 도시 일괄 지정" 도구 추가 — 자동 인식(역지오코딩)이 미덥지 않을 때를 위해, "09-09|런던"처럼 "그 도시에 머문 마지막 날짜 | 도시명"을 한 줄씩 적으면 여행 시작일부터 그 날짜까지(그다음 줄은 이전 구간 다음날부터) 해당하는 지출들의 도시를 한 번에 확실하게 덮어씀. 좌표 조회에 기대지 않는 방식이라 100% 정확하게 반영되고, 한국으로 표기된 지출은 자동으로 건너뜀. 입력창은 기본으로 09-09 런던, 09-13 바르셀로나, 09-15 그라나다, 09-19 세비야로 미리 채워져 있어 "일괄 적용" 한 번이면 끝.' },
     { date: '2026-09-19', note: '"도시별" 자동 인식이 계속 "기타"에서 안 바뀌던 문제의 진짜 원인을 찾아 수정 — Apps Script 백엔드로 안정성을 높인 지난 수정 이전에, 대부분의 좌표가 "시도했지만 못 찾음(null)"으로 이미 캐시돼 있었는데, 그 캐시가 있으면 무조건 "이미 시도해봄"으로 보고 다시는 재시도를 안 하던 버그가 있었음(백엔드가 아무리 좋아져도 이미 null로 저장된 좌표는 영영 그대로 남는 구조였음). 이제는 실제로 도시명을 찾았을 때만 캐시하고, 못 찾은 좌표는 캐시하지 않아 "도시별" 탭을 열 때마다 항상 다시 시도함 — 기존에 잘못 저장된 null 캐시도 자동으로 다시 풀림. 인식 결과 토스트에 Apps Script 응답이 없었는지도 함께 표시해서(예: "code.gs 재배포를 확인해주세요") 원인을 바로 알 수 있게 함.' },
     { date: '2026-09-19', note: '"도시별" 자동 도시 인식이 대부분 "기타"로만 빠지던 문제 개선 — 브라우저가 Nominatim(OpenStreetMap 역지오코딩)을 직접 호출하면 앱을 식별할 방법이 마땅치 않아 조용히 막히는 경우가 많았는데, 이미 구글지도 짧은 링크 풀이에 쓰고 있는 Apps Script 백엔드를 거치도록 바꿔 훨씬 안정적으로 도시를 찾아오게 함(설정에 Google Drive 자동 백업 URL이 등록돼 있어야 하며, code.gs를 최신 버전으로 다시 배포해야 적용됨). 미설정 시에는 예전처럼 브라우저 직접 호출로 자동 대체.' },
     { date: '2026-09-19', note: '"도시별" 탭 도시 자동 인식을 버튼 클릭 없이 자동 실행으로 변경 — 탭을 열면 기존에 이미 입력해둔 지출까지 포함해 바로 주소 기반으로 도시를 채움. 상단 요약을 "방문 도시/방문 장소/전체 여행"에서 "방문 국가/방문 도시/방문 장소"로 바꾸고, 그 아래에 국가별 방문 도시 수(예: 🇬🇧 영국 1곳 · 🇪🇸 스페인 2곳)를 추가로 표시.' },
@@ -3067,6 +3075,12 @@
   let rcMarkers = [];
   let rcMiniMaps = [];
   let recapView = 'map'; // 'map' | 'mini' | 'cities' — "여행기록" 안의 하위 탭(시안 1·2번을 정식 탭으로 편입)
+  // 2026-09-19 추가: 역지오코딩이 못 미덥다는 피드백 → 날짜 구간으로 도시를 한 번에 확정 지정하는 도구.
+  // "9/9일까지 런던, 9/13일까지 바르셀로나..." 처럼 실제 일정 순서를 그대로 적으면 그 구간의 지출 city를
+  // 일괄로 덮어써서, 자동 인식이 실패해도(또는 잘못 찾아도) 확실하게 도시가 반영되게 한다.
+  let cityRangeEditorOpen = false;
+  let cityRangeDraftText = null; // null이면 아래 기본 제안값을 보여줌 — 사용자가 고치면 그 값을 기억해둠
+  const CITY_RANGE_DEFAULT_TEXT = '09-09|런던\n09-13|바르셀로나\n09-15|그라나다\n09-19|세비야';
 
   function teardownRecapMap(){
     if(rcMap){ try{ rcMap.remove(); }catch(err){} rcMap = null; }
@@ -3285,6 +3299,53 @@
     // (backend 0건이면 code.gs 재배포부터 확인) 바로 알 수 있게 한다.
     console.info('도시 자동 인식 결과', { 시도: targets.size, 새로찾음: found, 경로별: viaCounts });
     showToast(`${targets.size}곳 중 ${found}곳의 도시를 새로 찾았어요${viaCounts.backend === 0 && data.settings.driveUrl ? ' (Apps Script 응답 없음 — code.gs 재배포를 확인해주세요)' : ''}`);
+  }
+
+  function addDaysToDateStr(dateStr, days){
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  // 구간별 도시 일괄 지정 — 줄마다 "그 도시에 머문 마지막 날짜 | 도시명"을 순서대로 받아서,
+  // 여행 시작일부터 첫 줄 날짜까지는 첫 도시, 그다음 구간은 이전 구간이 끝난 다음날부터 그 줄 날짜까지로
+  // 계산해 해당 기간의 모든 지출(한국 제외)에 city를 그 도시명으로 덮어쓴다. 역지오코딩과 달리 100% 확실하다.
+  function parseCityRangeLines(rawText, tripStartDate){
+    const year = tripStartDate.slice(0, 4);
+    const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
+    const ranges = [];
+    for(const line of lines){
+      const m = line.match(/^(\d{1,2})[\/\-](\d{1,2})\s*[|,\t]\s*(.+)$/);
+      if(!m) return { error: `형식을 확인해주세요: "${line}" (예: 09-09|런던)` };
+      const mm = m[1].padStart(2, '0'), dd = m[2].padStart(2, '0');
+      ranges.push({ end: `${year}-${mm}-${dd}`, city: m[3].trim() });
+    }
+    if(!ranges.length) return { error: '한 줄 이상 입력해주세요 (예: 09-09|런던)' };
+    ranges.sort((a, b) => a.end.localeCompare(b.end));
+    return { ranges };
+  }
+  function applyCityRanges(rawText){
+    const trip = currentTrip();
+    if(!trip.startDate){ showToast('먼저 설정에서 이 여행의 시작일을 입력해주세요'); return; }
+    const parsed = parseCityRangeLines(rawText, trip.startDate);
+    if(parsed.error){ showToast(parsed.error); return; }
+    let rangeStart = trip.startDate;
+    const list = tripExpenses(trip.id);
+    let changed = 0;
+    parsed.ranges.forEach(r => {
+      list.forEach(e => {
+        if(isKoreaCountryName(e.country)) return;
+        if(e.date >= rangeStart && e.date <= r.end && e.city !== r.city){
+          e.city = r.city;
+          changed++;
+        }
+      });
+      rangeStart = addDaysToDateStr(r.end, 1);
+    });
+    saveData(data);
+    render();
+    if(el('recapTabPanel').style.display !== 'none') renderRecap();
+    showToast(changed ? `${changed}건의 지출에 도시 정보를 적용했어요` : '변경된 지출이 없어요(이미 다 맞게 적용돼 있어요)');
   }
 
   // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
@@ -3626,6 +3687,17 @@
     const resolveCitiesBtnHtml = resolvingCities
       ? `<p class="rc-hint">🏙 주소를 기반으로 도시를 자동 인식하는 중이에요...</p>`
       : '';
+    const cityRangeTextValue = cityRangeDraftText !== null ? cityRangeDraftText : CITY_RANGE_DEFAULT_TEXT;
+    const cityRangeToolHtml = `
+      <div class="rc-cityrange-tool">
+        <button type="button" class="toolbtn" id="cityRangeToggleBtn" style="width:100%; justify-content:center; margin-bottom:${cityRangeEditorOpen ? '10px' : '14px'};">📅 구간별로 도시 일괄 지정${cityRangeEditorOpen ? ' 닫기 ▴' : ' ▾'}</button>
+        ${cityRangeEditorOpen ? `
+        <div class="rc-cityrange-panel">
+          <p class="note">한 줄에 "그 도시에 머문 마지막 날짜 | 도시명" 순서로 적어주세요. 여행 시작일부터 첫 줄 날짜까지가 첫 구간, 그다음은 이전 구간 다음날부터 그 줄 날짜까지예요. 역지오코딩보다 확실하게 반영돼요.</p>
+          <textarea id="cityRangeInput" rows="5">${escapeHtml(cityRangeTextValue)}</textarea>
+          <button type="button" class="addbtn" id="cityRangeApplyBtn" style="width:100%; margin-top:8px;">일괄 적용</button>
+        </div>` : ''}
+      </div>`;
 
     const hintText = usingRealMap
       ? `실제 좌표 기반 지도예요${tlData && tlData.visits ? ` (구글 타임라인 GPS ${tlData.visits.length}곳 포함)` : ''}.${showLeafletMap ? ' 지도를 드래그·확대하거나 핀을 눌러보세요.' : ' 핀이나 아래 칩을 눌러보세요.'}`
@@ -3713,7 +3785,7 @@
     if(recapView === 'mini'){
       viewBodyHtml = renderRecapMiniHtml(realPoints, countryOrder, usingRealMap);
     } else if(recapView === 'cities'){
-      viewBodyHtml = resolveCitiesBtnHtml + renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
+      viewBodyHtml = resolveCitiesBtnHtml + cityRangeToolHtml + renderRecapCitiesHtml(cityBucketsFromList(sortedList), trip, dayCount);
     } else {
       viewBodyHtml = `
         <p class="rc-hint">${hintText}</p>
@@ -3759,6 +3831,8 @@
     if(subtabBtn){ recapView = subtabBtn.dataset.recapView; renderRecap(); return; }
     if(e.target.closest('#timelineUploadBtn')){ const fi = el('timelineUploadFile'); if(fi) fi.click(); return; }
     if(e.target.closest('#resolveCoordsBtn')){ resolveAllTripAddrCoords(); return; }
+    if(e.target.closest('#cityRangeToggleBtn')){ cityRangeEditorOpen = !cityRangeEditorOpen; renderRecap(); return; }
+    if(e.target.closest('#cityRangeApplyBtn')){ const ta = el('cityRangeInput'); if(ta) applyCityRanges(ta.value); return; }
     if(e.target.closest('.toolbtn') || e.target.closest('.miniicon')) return;
     const target = e.target.closest('.rc-pin, .rc-chip');
     if(target) recapSelectCountry(target.dataset.country);
@@ -3769,6 +3843,9 @@
       handleTimelineUpload(file);
       e.target.value = '';
     }
+  });
+  el('recapTabPanel').addEventListener('input', e => {
+    if(e.target.id === 'cityRangeInput'){ cityRangeDraftText = e.target.value; }
   });
 
   // 2026-09-18 추가: 구글 타임라인(위치기록) 내보내기 JSON(semanticSegments 형식)을 읽어, 이 여행 기간에
