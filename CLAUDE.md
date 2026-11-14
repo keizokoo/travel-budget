@@ -3,7 +3,7 @@
 ## 무엇
 - 해외 여행 경비 정리·정산 PWA. 여행별로 이동(이전/다음 여행), 날짜별·장소별 보기(data-view: day, place).
 - 파일: index.html(단일 파일, 약 0.27MB) · sw.js · manifest.json · 아이콘.
-- 데이터: Google 시트 ↔ Apps Script 웹앱 연동 (확인 필요: 실제 사용 여부와 Code.gs 위치).
+- 데이터: Google 시트 ↔ Apps Script 웹앱 연동. 서버 코드: `gas/Code.gs` (2026-11-15 서버 현재본에서 가져옴).
 
 ## 이 앱만의 주의점
 - 환율 환산·정산(누가 얼마를 내는지) 계산을 바꾸면 `financial-calc-verification` 스킬 적용.
