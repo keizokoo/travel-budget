@@ -803,6 +803,7 @@
       <button class="toolbtn" id="importBtn">⬆ 가져오기 (복원)</button>
       <input type="file" id="importFile" accept="application/json" style="display:none;">
       <button class="toolbtn" id="toolbarMoreBtn">⋯ 더보기</button>
+      <button class="toolbtn" id="syncBadge" style="display:none;" title="백업 상태 · 눌러서 자세히 보기"></button>
     </div>
     <div class="toolbar" id="toolbarExtra" style="display:none;">
       <button class="toolbtn" id="csvExportBtn">📄 CSV 내보내기</button>
@@ -897,7 +898,7 @@
       <h4>저장공간 사용량</h4>
       <div class="storagebar"><div class="storagebar-fill" id="storageBarFill" style="width:0%;"></div></div>
       <p class="note" id="storageNote" style="margin-top:6px;"></p>
-      <p class="note">영수증 사진은 브라우저 저장공간(localStorage)에 압축되어 저장됩니다. 사진이 많아지면 공간이 부족해질 수 있으니, 아래 "내보내기"로 주기적으로 백업해두는 것을 권장합니다.</p>
+      <p class="note">영수증 사진은 기기의 사진 전용 저장소(IndexedDB)에 따로 보관되어, 사진이 많아져도 지출 데이터 저장공간을 차지하지 않습니다. 사진이 많아지면 공간이 부족해질 수 있으니, 아래 "내보내기"로 주기적으로 백업해두는 것을 권장합니다.</p>
     </div>
 
     <div class="block">
@@ -927,13 +928,35 @@
         <option value="360">6시간마다</option>
       </select>
       <p class="note" id="lastBackupTime" style="margin-top:8px;"></p>
+      <p class="note" id="backupStateNote" style="margin-top:4px;"></p>
+      <div class="syncbtns" id="backupRetryRow" style="display:none;"><button id="backupRetryBtn">↻ 다시 시도</button></div>
+      <p class="note" id="serverVersionNote" style="margin-top:4px;"></p>
       <p class="note" style="margin-top:6px;">URL은 Apps Script를 웹 앱으로 배포하면 발급됩니다. 영수증 사진을 포함한 전체 데이터가 Google Drive에 JSON 파일로 저장되며, 최근 5개 이력도 함께 보관됩니다.</p>
     </div>
 
     <div class="block">
       <h4>여행 삭제</h4>
-      <p class="note">현재 선택된 여행과 그 안의 모든 지출 내역이 삭제됩니다. 되돌릴 수 없으니 먼저 내보내기로 백업해두세요.</p>
+      <p class="note">현재 선택된 여행과 그 안의 모든 지출 내역이 삭제됩니다. 삭제 후 30일 동안은 아래 "삭제 보관함"에서 복구할 수 있습니다.</p>
       <button class="toolbtn warn-btn" id="deleteTripBtn" style="width:100%; justify-content:center; border-color:var(--warn); color:var(--warn);">이 여행 삭제</button>
+    </div>
+
+    <div class="block">
+      <h4>삭제 보관함</h4>
+      <p class="note" style="margin-bottom:8px;">앱에서 지운 지출·여행을 30일 동안 보관합니다. "복구"를 누르면 원래 자리로 돌아옵니다.</p>
+      <div id="trashList"></div>
+    </div>
+
+    <div class="block">
+      <h4>복원 전 자동 보관본</h4>
+      <p class="note" style="margin-bottom:8px;">"Drive에서 복원"이나 "가져오기"로 덮어쓰기 직전의 데이터를 이 기기에 최근 3개까지 보관합니다.</p>
+      <div id="snapList"></div>
+    </div>
+
+    <div class="block">
+      <h4>오류 기록</h4>
+      <p class="note" style="margin-bottom:8px;">화면이 멈추거나 버튼이 안 먹을 때 원인이 여기에 남습니다. 문의할 때 "복사"해서 붙여 주세요.</p>
+      <div class="note" id="errLogList" style="max-height:160px; overflow:auto;"></div>
+      <div class="syncbtns"><button id="errLogCopyBtn">📋 복사</button><button id="errLogClearBtn">지우기</button></div>
     </div>
 
     <div class="block">
@@ -1009,6 +1032,38 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="updateBanner" style="display:none; position:fixed; left:12px; right:12px; bottom:14px; z-index:9999; background:#1F2A28; color:#fff; border-radius:12px; padding:11px 14px; font-size:13px; box-shadow:0 6px 22px rgba(0,0,0,.28); align-items:center; gap:10px;"><span style="flex:1;">새 버전이 있어요.</span><button id="updateBannerBtn" style="border:0; border-radius:8px; padding:7px 12px; font-weight:700; cursor:pointer;">새로고침</button><button id="updateBannerClose" style="border:0; background:transparent; color:#fff; font-size:15px; cursor:pointer;">✕</button></div>
+<script>
+/* 오류 기록(2026-11-14): 화면이 멈추거나 버튼이 안 먹을 때 원인을 남긴다. 최근 20건을 이 기기에만 보관. */
+(function(){
+  var KEY='travel_budget_errlog_v1', MAX=20;
+  function read(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]')||[]; }catch(e){ return []; } }
+  function add(kind,msg,where){
+    try{
+      var a=read(), m=String(msg||'').slice(0,300), w=String(where||'').slice(0,160);
+      if(a.length && a[0].m===m && a[0].w===w){ a[0].n=(a[0].n||1)+1; a[0].t=Date.now(); }
+      else a.unshift({t:Date.now(),k:kind,m:m,w:w,n:1});
+      localStorage.setItem(KEY, JSON.stringify(a.slice(0,MAX)));
+    }catch(e){}
+  }
+  window.addEventListener('error', function(e){
+    if(e && e.target && e.target!==window && e.target.tagName){ return; }
+    add('오류', e && e.message, e && e.filename ? (String(e.filename).split('/').pop()+':'+e.lineno+':'+e.colno) : '');
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    var r=e && e.reason; add('비동기 오류', r && (r.message||r), r && r.stack ? String(r.stack).split('\n')[1] : '');
+  });
+  function p(n){ return String(n).padStart(2,'0'); }
+  function fmt(t){ var d=new Date(t); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+  window.AppErrLog={
+    list: read,
+    clear: function(){ try{ localStorage.removeItem(KEY); }catch(e){} },
+    text: function(build){ var a=read(); return '[오류 기록] '+(build||'')+'\n'+(a.length? a.map(function(x){ return fmt(x.t)+' · '+x.k+(x.n>1?' ×'+x.n:'')+' · '+x.m+(x.w?' ('+x.w+')':''); }).join('\n') : '기록 없음'); },
+    html: function(){ var a=read(); if(!a.length) return '<div style="opacity:.7">기록된 오류가 없어요.</div>';
+      return a.map(function(x){ var s=(fmt(x.t)+' · '+x.k+(x.n>1?' ×'+x.n:'')+' · '+x.m+(x.w?' ('+x.w+')':'')).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); return '<div style="padding:4px 0;border-bottom:1px solid rgba(128,128,128,.25);word-break:break-all">'+s+'</div>'; }).join(''); }
+  };
+})();
+</script>
 
 <script>
 (function(){
@@ -1022,11 +1077,9 @@
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
 
-  // 앱 버전 · 최근 수정 이력. 수정할 때마다 맨 위(배열 앞)에 새 항목을 추가한다.
-  // 설정 화면 "앱 정보 · 수정 이력"에 그대로 표시되어, 사용자가 지금 보고 있는 화면이
-  // 최신 수정사항을 실제로 포함하는지 앱 안에서 바로 확인할 수 있게 한다.
-  const APP_BUILD = '2026-09-19-10';
+  const APP_BUILD = '2026-11-14-a';
   const CHANGELOG = [
+    { date: '2026-11-14', note: '안전장치 묶음(Code.gs 2026-11-14와 짝) — ① 백업이 실제로 저장됐는지 서버 응답을 확인(이전에는 실패해도 "완료"로 표시됨) ② 화면 위 백업 상태 배지(실패 사유·다시 시도) ③ 삭제 보관함(지운 지출·여행 30일 보관·복구) ④ 지출 건수가 크게 줄면 자동 백업을 멈추고 확인 ⑤ 복원·가져오기 직전 데이터를 이 기기에 자동 보관 ⑥ 영수증 사진을 사진 전용 저장소로 옮겨 저장공간 부족 방지 ⑦ 새 버전 안내 ⑧ 지도·글자 인식 파일을 기기에 저장해 인터넷이 끊겨도 한 번 본 지도는 표시 ⑨ 오류 기록 화면 ⑩ 서버 버전 표시.' },
     { date: '2026-09-19', note: '여행기록 상단 요약 카드 3번째 칸을 "전체 지출"에서 "방문 도시"(국가+도시 조합 개수)로 교체(지출 총액은 지출내역 탭에 이미 있어 중복 제거). "도시별" 탭 개선 4가지 — ① 같은 날 안에서 여러 도시를 방문했을 때 지출 입력 순서가 아니라 시각(입력 안 한 지출은 00:00 취급) 기준으로 정렬되도록 고쳐서, 스페인처럼 같은 날 이동이 겹치는 경우에도 실제 방문 순서대로 도시가 나열됨(그래도 순서가 이상하면 그 지출의 날짜 자체가 잘못 입력됐을 가능성이 크니 지출내역에서 확인 필요). ② 도시 카드에 "Day N" 대신 실제 달력 날짜(예: 9/10 – 9/13) 체류 기간 표시 추가. ③ 상호명·주소가 없는 지출도 태그로 빠짐없이 표시되도록 바꿈(전엔 주소/상호명 있는 지출만 보였음) — 태그를 누르면 그 지출 상세 팝업이 뜨고, 지도 링크·메모까지 확인 가능. ④ 도시를 지정 안 한 지출("기타")은 카드에 경고 문구와 함께 몇 건인지 표시되고, 태그를 눌러 뜨는 팝업 안에서 그 자리에서 바로 도시를 골라 지정할 수 있음(구글지도 주소가 있으면 팝업에 그대로 보여줘서 어디였는지 확인하며 고를 수 있음) — 영국 "기타"처럼 도시가 비어서 뭉뚱그려지던 지출들을 빠짐없이 찾아 하나씩 정리 가능. 홈 화면에 추가해 앱처럼(PWA standalone) 쓸 때 구글지도 주소 링크를 누르면 새 탭이 빈 화면/오류로 뜨던 iOS 문제 수정 — standalone 모드에서는 새 탭 대신 현재 창에서 바로 이동시켜 정상적으로 지도로 연결되게 함(적용되려면 앱을 완전히 종료 후 다시 열어야 함).' },
     { date: '2026-09-19', note: '도시 입력 방식을 전면 개편 — 자유입력 텍스트 칸을 없애고, 국가별로 등록해둔 도시 목록에서 드롭다운으로 선택하도록 바꿈. 설정에 "도시 관리" 화면을 새로 추가해 국가마다 도시를 추가·이름수정·삭제할 수 있고(카테고리/국가/통화 관리와 같은 방식), 지출 추가 화면에서도 "+ 새 도시 추가"로 바로 등록 가능. 예전엔 지출 수정 화면에 도시 입력칸 자체가 없어서 한 번 잘못 입력하거나 비워둔 도시를 고칠 방법이 없었는데, 이제 수정 화면에도 도시 드롭다운이 추가되어 언제든 바로잡을 수 있음. 기존에 자유입력으로 넣어뒀던 도시명(런던·바르셀로나 등)은 전부 자동으로 새 도시 목록에 편입되어 그대로 드롭다운에 나타남. 정확도가 낮았던 "도시별" 탭의 주소 기반 자동 인식(역지오코딩)과 "구간별 도시 일괄 지정" 도구는 이번 방식으로 대체되어 제거됨.' },
     { date: '2026-09-19', note: '"도시별" 탭에 "📅 구간별로 도시 일괄 지정" 도구 추가 — 자동 인식(역지오코딩)이 미덥지 않을 때를 위해, "09-09|런던"처럼 "그 도시에 머문 마지막 날짜 | 도시명"을 한 줄씩 적으면 여행 시작일부터 그 날짜까지(그다음 줄은 이전 구간 다음날부터) 해당하는 지출들의 도시를 한 번에 확실하게 덮어씀. 좌표 조회에 기대지 않는 방식이라 100% 정확하게 반영되고, 한국으로 표기된 지출은 자동으로 건너뜀. 입력창은 기본으로 09-09 런던, 09-13 바르셀로나, 09-15 그라나다, 09-19 세비야로 미리 채워져 있어 "일괄 적용" 한 번이면 끝.' },
@@ -1082,9 +1135,6 @@
   }
 
   // ---------- 국가별 시차(표준시 기준 UTC 오프셋, 시간 단위) ----------
-  // 카드승인 문자는 항상 한국시간(KST, UTC+9)으로 찍혀 나오므로, 지출을 등록할 국가를 고르면
-  // 그 국가의 현지 날짜/시각으로 자동 환산해준다. 한 국가에 시간대가 여러 개인 경우(미국·호주·러시아 등)는
-  // 가장 대표적인 시간대 하나로 근사한 값이라 정확하지 않을 수 있다.
   const COUNTRY_UTC_OFFSET = {
     "한국":9, "대한민국":9, "영국":0, "스페인":1, "프랑스":1, "이탈리아":1, "독일":1,
     "미국":-5, "일본":9, "중국":8, "대만":8, "홍콩":8, "마카오":8, "태국":7, "베트남":7,
@@ -1186,13 +1236,7 @@
     if(!d.timelineByTrip) d.timelineByTrip = {};
     if(!d.placeNameCache) d.placeNameCache = {};
     if(!d.placeNameOverride) d.placeNameOverride = {};
-    // 2026-09-18 추가: 짧은 구글맵 공유링크(placeAddr)를 Apps Script(서버)에서 풀어낸 좌표 캐시.
-    // 키는 placeAddr 원문 그대로 — { lat, lng, resolvedUrl, resolvedAt }. 좌표를 못 찾은 경우도
-    // lat:null로 저장해 매번 다시 시도하지 않는다.
     if(!d.placeAddrCoords) d.placeAddrCoords = {};
-    // 2026-09-19 추가: 도시를 국가별 목록으로 관리(설정 "도시 관리"에서 추가/수정/삭제) — 지출 추가/수정 화면에서는
-    // 직접 입력 대신 이 목록에서 드롭다운으로 선택한다. 국가가 새로 추가되거나 아직 목록이 없던 예전 데이터도
-    // 항상 빈 배열로 채워둬서 이후 코드에서 매번 존재 여부를 따로 체크하지 않아도 되게 한다.
     if(!d.citiesByCountry || typeof d.citiesByCountry !== 'object') d.citiesByCountry = {};
     d.countries.forEach(c => { if(!Array.isArray(d.citiesByCountry[c])) d.citiesByCountry[c] = []; });
     if(!d.lastFxRate) d.lastFxRate = {};
@@ -1208,10 +1252,6 @@
       if(!d.countries.includes('한국')) d.countries.push('한국');
       d._migrations.addKoreaCountry = true;
     }
-    // 일회성 마이그레이션: 메모에 이미 적어둔 구글지도 링크/주소를 새 "장소(구글지도)" 필드(placeAddr)로 옮긴다.
-    // 링크(맵 URL)가 있으면 그 부분만 뽑아 옮기고 나머지 메모는 그대로 둔다. 링크가 없어도 메모 전체가
-    // 주소로 보이는 패턴(영국 우편번호, 번지+도로명, "OO로/OO길" 등)이면 메모 전체를 주소로 간주해 옮긴다.
-    // 이후 사용자가 placeAddr을 지워도 다시 채우지 않도록 한 번만 실행한다.
     if(!d._migrations.extractMapAddrFromMemo){
       (d.expenses||[]).forEach(e => {
         if(e.placeAddr) return;
@@ -1241,9 +1281,6 @@
       }
       d._migrations.renameBeverageCategory = true;
     }
-    // 일회성 마이그레이션: 예전에는 도시를 지출마다 자유입력(텍스트)했었다. 그렇게 이미 입력해둔 도시명들을
-    // 국가별 도시 목록(citiesByCountry)에 자동으로 편입시켜, 드롭다운 방식으로 바뀐 뒤에도 기존 지출의
-    // 도시명이 목록에 그대로 나타나게 한다. 이후 사용자가 목록에서 지워도 다시 채우지 않도록 한 번만 실행한다.
     if(!d._migrations.migrateFreeTextCitiesToList){
       (d.expenses||[]).forEach(e => {
         const city = (e.city||'').trim();
@@ -1271,9 +1308,6 @@
     if(/^https?:\/\//i.test(s)) return s;
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s)}`;
   }
-  // 장소(구글지도) 값에서 상호명을 최대한 뽑아낸다 — 구글지도 링크는 보통 "/maps/place/상호명/@좌표..." 형태로
-  // 이름을 경로에 담고 있어 그 부분을 디코딩해서 쓰고, 좌표만 있는 링크거나 이름 부분을 못 찾으면 빈 문자열을 돌려준다.
-  // 링크가 아닌 텍스트 주소는 보통 "상호명, 도로명 주소" 순서로 적기 때문에 콤마 앞부분을 이름으로 본다.
   function placeNameFromAddr(addr){
     const s = (addr||'').trim();
     if(!s) return '';
@@ -1284,9 +1318,6 @@
       name = name.replace(/\+/g, ' ').trim();
       // 좌표만 담긴 경우("51.5033,-0.1195")는 이름이 아니므로 제외
       if(!name || /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/.test(name)) return '';
-      // 링크에 좌표(@lat,lng)가 따로 없는 형태는 구글이 "상호명, 도로명, 도시, 우편번호, 국가"를
-      // 전부 이 한 구간에 콤마로 이어붙여 넣는다(예: "St James's Café, Horse Guards Rd, London SW1A 2BJ 영국") —
-      // 이럴 땐 첫 콤마 앞부분만 실제 상호명이다.
       if(name.includes(',')) name = name.split(',')[0].trim();
       return name.slice(0, 40);
     }
@@ -1294,9 +1325,6 @@
     const firstPart = s.split(',')[0].trim();
     return (firstPart && firstPart.length <= 40) ? firstPart : '';
   }
-  // 구글지도 링크에서 좌표(위도,경도)를 뽑아낸다 — 보통 "/@위도,경도,줌레벨z" 형태로 들어있고,
-  // 링크 형태에 따라 "!3d위도!4d경도"(플레이스 상세 링크) 또는 "?q=위도,경도" 형태로도 들어올 수 있어 순서대로 시도한다.
-  // 짧은 공유링크(maps.app.goo.gl 등)처럼 좌표가 URL 자체에 없는 경우는 null을 돌려준다(추가 API 조회 없이는 알 수 없음).
   function extractLatLngFromAddr(addr){
     const s = (addr||'').trim();
     if(!s || !/^https?:\/\//i.test(s)) return null;
@@ -1308,9 +1336,6 @@
     if(!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
     return { lat, lng };
   }
-  // 구글맵 멀티스탑 경로(/maps/dir/…) 링크의 한 구간으로 쓸 수 있는 값을 지출 한 건에서 뽑아낸다.
-  // 좌표가 있으면 좌표(가장 정확), 없으면 상호명이나 주소 텍스트로 대체한다. 아무 것도 못 뽑으면(좌표 없는
-  // 짧은 공유링크 등) null — 그 지출은 통합 경로에서 제외된다.
   function waypointForExpense(e){
     if(e.placeAddr){
       const coords = extractLatLngFromAddr(e.placeAddr);
@@ -1318,10 +1343,6 @@
     }
     let name = e.placeName || (e.placeAddr ? placeNameFromAddr(e.placeAddr) : '');
     if(!name) return null;
-    // 좌표를 못 뽑은 경우(짧은 공유링크 maps.app.goo.gl 등은 URL 안에 좌표가 없어 여기로 떨어짐) 상호명만으로
-    // 경로를 만들면, 맥도날드/스타벅스처럼 전세계에 지점이 아주 많은 체인점은 구글지도가 어느 지점인지
-    // 특정하지 못해 후보 목록을 보여주며 선택을 요구한다. 그 지출에 기록된 도시·국가를 붙여 검색어를
-    // 좁혀서 정확한 지점을 바로 찾도록 돕는다.
     const locality = [e.city, e.country].filter(Boolean).join(' ');
     if(locality) name = `${name}, ${locality}`;
     return name;
@@ -1338,12 +1359,112 @@
     return `https://www.google.com/maps/dir/${waypoints.map(w => encodeURIComponent(w)).join('/')}`;
   }
 
+  // ---------- 영수증 사진 전용 저장소 (2026-11-14) ----------
+  const PHOTO_MARK = '@idb';
+  let photoDb = null;                 // 열린 IndexedDB (없으면 예전 방식)
+  let photosReady = false;            // 저장소의 사진을 메모리에 다 붙였는지
+  const pendingPhotoIds = new Set();  // 표시만 있고 아직 사진을 못 붙인 지출 id
+  const photoKnown = new Map();       // 저장소에 들어 있는 사진: id → 길이
+  function idbOpen(){
+    return new Promise(resolve => {
+      try{
+        const req = indexedDB.open('travel_budget_db', 1);
+        req.onupgradeneeded = () => { const db = req.result; if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos'); if(!db.objectStoreNames.contains('snaps')) db.createObjectStore('snaps'); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+        req.onblocked = () => resolve(null);
+      }catch(e){ resolve(null); }
+    });
+  }
+  function idbReq(store, mode, fn){
+    return new Promise((resolve, reject) => {
+      if(!photoDb){ reject(new Error('no-idb')); return; }
+      try{
+        const tx = photoDb.transaction(store, mode); const out = fn(tx.objectStore(store));
+        tx.oncomplete = () => resolve(out && out.result !== undefined ? out.result : out);
+        tx.onerror = () => reject(tx.error || new Error('idb')); tx.onabort = () => reject(tx.error || new Error('idb-abort'));
+      }catch(e){ reject(e); }
+    });
+  }
+  function photoHolders(d){   // 사진을 가질 수 있는 지출 전부(보관함 안의 지출 포함)
+    const list = (d.expenses || []).slice();
+    (d.trash || []).forEach(t => (t.expenses || []).forEach(e => list.push(e)));
+    return list;
+  }
+  function stripPhotos(d){    // localStorage에 쓸 사본: 사진 자리에 표시만 남긴다
+    const light = e => (e.receipt || pendingPhotoIds.has(e.id)) ? Object.assign({}, e, { receipt: PHOTO_MARK }) : e;
+    const out = Object.assign({}, d, { expenses: (d.expenses || []).map(light) });
+    if(d.trash) out.trash = d.trash.map(t => t.expenses ? Object.assign({}, t, { expenses: t.expenses.map(light) }) : t);
+    return out;
+  }
+  function serializeForStorage(d){ return JSON.stringify(photoDb ? stripPhotos(d) : d); }
+  let photoSyncBusy = false, photoSyncAgain = false;
+  async function syncPhotosToDb(d){   // 메모리의 사진과 저장소를 맞춘다(새 사진 넣기, 없어진 사진 지우기)
+    if(!photoDb || !photosReady) return;
+    if(photoSyncBusy){ photoSyncAgain = true; return; }
+    photoSyncBusy = true;
+    try{
+      const want = new Map();
+      photoHolders(d).forEach(e => { if(e.receipt && e.receipt !== PHOTO_MARK) want.set(e.id, e.receipt); });
+      const puts = [], dels = [];
+      want.forEach((v, id) => { if(photoKnown.get(id) !== v.length) puts.push([id, v]); });
+      photoKnown.forEach((len, id) => { if(!want.has(id)) dels.push(id); });
+      if(puts.length || dels.length){
+        await idbReq('photos', 'readwrite', st => { puts.forEach(([id, v]) => st.put(v, id)); dels.forEach(id => st.delete(id)); });
+        puts.forEach(([id, v]) => photoKnown.set(id, v.length)); dels.forEach(id => photoKnown.delete(id));
+      }
+    }catch(e){ console.warn('photo sync failed', e); }
+    photoSyncBusy = false;
+    if(photoSyncAgain){ photoSyncAgain = false; syncPhotosToDb(data); }
+  }
+  async function initPhotoStore(){
+    const db = await idbOpen();
+    if(!db){ photosReady = true; return; }   // 예전 방식 유지
+    photoDb = db;
+    try{
+      const got = await new Promise((resolve, reject) => {
+        const tx = db.transaction('photos', 'readonly'), st = tx.objectStore('photos'), map = new Map();
+        const cur = st.openCursor();
+        cur.onsuccess = () => { const c = cur.result; if(c){ map.set(c.key, c.value); c.continue(); } };
+        tx.oncomplete = () => resolve(map); tx.onerror = () => reject(tx.error);
+      });
+      got.forEach((v, id) => photoKnown.set(id, String(v).length));
+      let attached = 0;
+      photoHolders(data).forEach(e => { if(pendingPhotoIds.has(e.id)){ e.receipt = got.get(e.id) || null; if(e.receipt) attached++; } });
+      pendingPhotoIds.clear();
+      photosReady = true;
+      // 처음 한 번: 예전에 localStorage에 통째로 들어 있던 사진을 저장소로 옮긴 뒤, 옮겨진 것을 확인하고 나서 localStorage를 가볍게 다시 쓴다.
+      await syncPhotosToDb(data);
+      const allIn = photoHolders(data).every(e => !e.receipt || photoKnown.get(e.id) === e.receipt.length);
+      if(allIn){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(stripPhotos(data))); }catch(e){} }
+      else { photoDb = null; }   // 옮기지 못했으면 예전 방식 그대로(사진을 잃지 않는 쪽)
+      if(attached) render();
+    }catch(e){ console.warn('photo store init failed', e); photoDb = null; pendingPhotoIds.clear(); photosReady = true; }
+  }
+  function whenPhotosReady(){
+    return new Promise(resolve => { const tick = () => photosReady ? resolve() : setTimeout(tick, 60); tick(); });
+  }
+  // 복원·가져오기로 덮어쓰기 직전의 데이터를 이 기기에 보관(최근 3개)
+  async function saveSnapshot(reason){
+    if(!photoDb) return false;
+    try{
+      await whenPhotosReady();
+      const key = Date.now();
+      await idbReq('snaps', 'readwrite', st => { st.put({ at: key, reason, expenses: data.expenses.length, trips: data.trips.length, json: JSON.stringify(data) }, key); });
+      const keys = await idbReq('snaps', 'readonly', st => st.getAllKeys());
+      const old = (keys || []).sort((a,b)=>b-a).slice(3);
+      if(old.length) await idbReq('snaps', 'readwrite', st => { old.forEach(k => st.delete(k)); });
+      return true;
+    }catch(e){ return false; }
+  }
+
   function loadData(){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
         if(parsed && parsed.trips && parsed.expenses){
+          photoHolders(parsed).forEach(e => { if(e.receipt === PHOTO_MARK){ e.receipt = null; pendingPhotoIds.add(e.id); } });
           return normalizeData(parsed);
         }
       }
@@ -1355,25 +1476,75 @@
 
   let autoBackupTimer = null;
   function saveData(d){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+    pruneTrash(d);
+    try{ localStorage.setItem(STORAGE_KEY, serializeForStorage(d)); }
     catch(e){
       console.warn("save failed", e);
-      showToast("저장 실패: 브라우저 저장공간이 가득 찼을 수 있어요. 오래된 영수증 사진을 정리해주세요.");
+      showToast("저장 실패: 기기 저장공간이 가득 찼을 수 있어요. 설정에서 내보내기로 백업한 뒤 오래된 여행을 정리해주세요.");
+      try{ if(window.AppErrLog) window.dispatchEvent(new ErrorEvent('error', { message: '저장 실패(저장공간 초과 가능): ' + (e && e.name || e) })); }catch(x){}
     }
+    syncPhotosToDb(d);
     if(d.settings && d.settings.autoBackup && d.settings.driveUrl){
       clearTimeout(autoBackupTimer);
       autoBackupTimer = setTimeout(() => { backupToDrive(true); }, 1500);
     }
   }
 
+  // ---------- 삭제 보관함 (2026-11-14) ----------
+  const TRASH_KEEP_DAYS = 30;
+  function pruneTrash(d){
+    if(!d || !Array.isArray(d.trash)) return;
+    const limit = Date.now() - TRASH_KEEP_DAYS * 86400000;
+    d.trash = d.trash.filter(t => t && t.at >= limit);
+  }
+  function trashExpenses(list){
+    if(!list || !list.length) return;
+    if(!Array.isArray(data.trash)) data.trash = [];
+    data.trash.unshift({ id: uid(), kind: 'expense', at: Date.now(), expenses: list });
+  }
+  function trashTrip(trip, expenses, days, timeline){
+    if(!Array.isArray(data.trash)) data.trash = [];
+    data.trash.unshift({ id: uid(), kind: 'trip', at: Date.now(), trip, expenses: expenses || [], days: days || [], timeline: timeline || null });
+  }
+  function restoreTrash(id){
+    const t = (data.trash || []).find(x => x.id === id); if(!t) return;
+    if(t.kind === 'trip'){
+      if(!data.trips.find(x => x.id === t.trip.id)) data.trips.push(t.trip);
+      (t.days || []).forEach(dy => { if(!data.itineraryDays.find(x => x.id === dy.id)) data.itineraryDays.push(dy); });
+      if(t.timeline){ if(!data.timelineByTrip) data.timelineByTrip = {}; if(!data.timelineByTrip[t.trip.id]) data.timelineByTrip[t.trip.id] = t.timeline; }
+    }
+    let skipped = 0;
+    (t.expenses || []).forEach(e => {
+      if(data.expenses.find(x => x.id === e.id)) return;
+      if(!data.trips.find(x => x.id === e.tripId)){ skipped++; return; }
+      data.expenses.push(e);
+    });
+    if(skipped){ showToast(`여행이 지워져 있어 ${skipped}건은 복구하지 못했어요. 여행을 먼저 복구해 주세요.`); if(skipped === (t.expenses || []).length) return; }
+    data.trash = data.trash.filter(x => x.id !== id);
+    saveData(data); render(); renderTrash();
+    if(!skipped) showToast('복구했습니다');
+  }
+  function renderTrash(){
+    const box = el('trashList'); if(!box) return;
+    pruneTrash(data);
+    const list = data.trash || [];
+    if(!list.length){ box.innerHTML = '<p class="note">보관 중인 항목이 없습니다.</p>'; return; }
+    box.innerHTML = list.map(t => {
+      const left = Math.max(0, TRASH_KEEP_DAYS - Math.floor((Date.now() - t.at) / 86400000));
+      const when = new Date(t.at).toLocaleString('ko-KR', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      const label = t.kind === 'trip'
+        ? `여행 "${escapeHtml(t.trip.name || '')}" · 지출 ${(t.expenses || []).length}건`
+        : ((t.expenses || []).length === 1 ? `${escapeHtml(t.expenses[0].date || '')} ${escapeHtml(t.expenses[0].item || '')} · ${Math.round(Number(t.expenses[0].amountKrw) || 0).toLocaleString('ko-KR')}원` : `지출 ${(t.expenses || []).length}건`);
+      return `<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line2);"><div style="flex:1; min-width:0; font-size:12.5px;"><div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${label}</div><div class="note">${when} 삭제 · ${left}일 뒤 완전 삭제</div></div><button class="toolbtn" data-trash-restore="${t.id}">복구</button></div>`;
+    }).join('');
+  }
+
   let data = loadData();
+  initPhotoStore();
 
   function currentTrip(){ return data.trips.find(t => t.id === data.currentTripId) || data.trips[0]; }
   function tripExpenses(tripId){ return data.expenses.filter(e => e.tripId === tripId).sort((a,b)=> a.date.localeCompare(b.date)); }
 
-  // 같은 트립 안에서 "같은 날짜 + 같은 통화 + 같은 금액(외화면 외화금액, 원화면 원화금액)"인 기존 지출을 찾는다.
-  // 문자 자동인식과 영수증 OCR 두 경로로 같은 결제 건이 이중 입력되는 걸 막기 위한 보조 장치 — 강제 차단은 아니고
-  // 저장 직전 사용자에게 한 번 더 확인만 시킨다(시각까지 같으면 더 강하게, 시각이 달라도 후보로는 보여줌).
   function findPossibleDuplicate(tripId, date, currency, amountForeign, amountKrw, excludeId){
     const target = currency === 'KRW' ? amountKrw : amountForeign;
     return data.expenses.find(x => {
@@ -1423,9 +1594,6 @@
   // 문자/사진 인식으로 채워진 날짜·시각이 아직 "한국시간 그대로"인 상태를 기억해뒀다가,
   // 국가를 선택(변경)하면 그 국가의 현지시각으로 자동 환산한다. 사용자가 날짜/시각을 직접 고치면 비운다.
   let pendingKstDateTime = null;
-  // 반환값으로 "실제로 어느 국가 기준으로 변환했는지"를 알려준다 — 호출부(문자/사진 인식 요약문 등)가
-  // 이걸 화면에 그대로 보여줘서, 국가가 잘못 선택된 상태로 조용히 엉뚱한 시차가 적용되는 걸 사용자가
-  // 바로 알아챌 수 있게 한다(이전에는 변환은 되지만 결과를 요약문에서 확인할 길이 없었다).
   function applyTimezoneConversion(silent){
     if(!pendingKstDateTime) return null;
     const country = el('newCountry').value;
@@ -1500,10 +1668,6 @@
     if(data.countries.includes(prev)){
       sel.value = prev;
     } else {
-      // 새로고침 직후 등 아직 아무 것도 선택 안 된 상태면, 목록 맨 앞 국가가 아니라 이번 트립에서
-      // 가장 최근에 추가한 지출의 국가를 기본값으로 쓴다. 카드승인 문자를 붙여넣는 순간 이 값 기준으로
-      // 한국시간→현지시간 자동 환산이 되므로(국가를 따로 안 건드리면 바뀐 걸 눈치채기 어렵다),
-      // 엉뚱한 기본 국가(목록 맨 앞)로 조용히 잘못 계산되는 걸 막기 위한 안전장치다.
       const recent = tripExpenses(data.currentTripId).slice(-1)[0];
       sel.value = (recent && data.countries.includes(recent.country)) ? recent.country : (data.countries[0] || '');
     }
@@ -1621,10 +1785,6 @@
       </div>`;
     }).join('');
   }
-  // 카테고리/국가/통화/카드구분 이름 변경 — 목록의 이름만 바꾸는 게 아니라 이미 저장된 지출 내역에서도
-  // 옛 이름을 쓰던 항목을 전부 새 이름으로 함께 바꿔줘야 데이터가 끊기지 않는다(그래서 사용 중이어도 삭제와
-  // 달리 이름 수정은 항상 허용). 통화는 환율 저장값(data.lastFxRate)도 같이 옮겨준다. KRW는 코드 전반에서
-  // 원화를 가리키는 고정값으로 쓰이므로 이름 변경 대상에서 제외한다.
   function renameListValue(list, oldName, newName, cascade){
     const idx = list.indexOf(oldName);
     if(idx === -1) return false;
@@ -1798,11 +1958,6 @@
     const [h,m] = hhmm.split(':').map(Number);
     return h*60+m;
   }
-  // 하루치 지출 목록을 시간순으로 정렬한다. 기본은 입력한 순서를 그대로 지킨다 — 카드승인시각(e.time)이
-  // 찍힌 항목만 그 실제 시각 기준으로 자리가 바뀌고, 시각을 모르는 항목끼리는 절대 서로 순서가 바뀌지 않는다.
-  // 시각 모르는 항목의 기준 위치는 "하루 활동시간(06~23시)" 이라는 고정된 값 안에서 입력순서 비례로 잡는다 —
-  // 그날 있는 다른 실제시각들로부터 그 범위를 계산하면(이전 버전의 버그), 그날 실제시각이 딱 하나뿐일 때
-  // 그 시각을 아무리 바꿔도 정렬 결과가 전혀 안 바뀌는 문제가 있어서 고정값으로 바꿨다.
   const DAY_SPREAD_START = 6*60;   // 06:00
   const DAY_SPREAD_END = 23*60;    // 23:00
   function sortDayItemsChronologically(items){
@@ -1846,13 +2001,14 @@
   el('bulkDeleteBtn').addEventListener('click', () => {
     if(!selectedIds.size) return;
     if(!confirm(`선택한 ${selectedIds.size}개 지출 내역을 삭제할까요?`)) return;
+    trashExpenses(data.expenses.filter(x => selectedIds.has(x.id)));
     data.expenses = data.expenses.filter(x => !selectedIds.has(x.id));
     selectedIds.forEach(id => expandedRowIds.delete(id));
     selectedIds.clear();
     saveData(data);
     render();
     renderBulkBar();
-    showToast('선택한 항목을 삭제했습니다');
+    showToast('선택한 항목을 삭제했습니다 (설정 > 삭제 보관함에서 30일 안에 복구 가능)');
   });
   el('bulkApplyCategoryBtn').addEventListener('click', () => {
     if(!selectedIds.size) return;
@@ -1877,9 +2033,6 @@
     const mapLinkHtml = e.placeAddr ? `<a class="map-link" href="${escapeHtml(mapUrlFor(e.placeAddr))}" target="_blank" rel="noopener">🗺 ${escapeHtml(mapPlaceName || '지도')}</a>` : '';
     const hasExtra = !!(e.memo || e.receipt || e.placeAddr);
     const expanded = expandedRowIds.has(e.id);
-    // 지도 링크에 좌표가 담겨 있으면(주로 "/@위도,경도" 형태) 작은 지도 미리보기를 보여준다 — API 키 없이 되는
-    // 구글맵 임베드라 좌표 없는 짧은 공유링크 등에서는 못 만든다. 여행 중 데이터를 아낄 수 있게 자동으로
-    // 불러오지 않고, 버튼을 눌렀을 때만 그 자리에서 지도를 불러온다(버튼 클릭 처리는 dayGroups 클릭 위임에 있음).
     const coords = e.placeAddr ? extractLatLngFromAddr(e.placeAddr) : null;
     const miniMapHtml = coords
       ? `<div class="mini-map"><button type="button" class="minimap-load-btn" data-mm-lat="${coords.lat}" data-mm-lng="${coords.lng}">🗺 지도 미리보기</button></div>`
@@ -2056,13 +2209,14 @@
       const limitMb = 5; // 대략적인 브라우저 localStorage 한도 추정치
       const pct = Math.min(100, (mb/limitMb*100));
       el('storageBarFill').style.width = pct.toFixed(1) + '%';
-      el('storageNote').textContent = `약 ${mb.toFixed(2)}MB 사용 중 (브라우저별로 한도가 달라 참고용입니다)`;
+      el('storageNote').textContent = `지출 데이터 약 ${mb.toFixed(2)}MB 사용 중 (한도 약 5MB, 브라우저별로 달라 참고용)`;
+      if(pct >= 80) el('storageNote').textContent += ' · ⚠ 거의 가득 찼어요. 내보내기로 백업한 뒤 오래된 여행을 정리해 주세요.';
+      if(navigator.storage && navigator.storage.estimate){
+        navigator.storage.estimate().then(s => { if(s && s.usage != null){ const n = el('storageNote'); if(n) n.textContent += ` · 사진 포함 기기 전체 약 ${(s.usage/1048576).toFixed(1)}MB`; } }).catch(()=>{});
+      }
     }catch(e){}
   }
 
-  // 설정 화면의 "앱 정보 · 수정 이력"을 채운다. 지금 이 화면이 최신 수정사항을 포함하고 있는지
-  // 사용자가 스스로 확인할 수 있게 해서 "고쳤다고 했는데 그대로다"라는 혼동(대개는 파일 교체/PWA
-  // 재설치가 아직 안 된 경우)을 줄이기 위한 용도. CHANGELOG는 수정할 때마다 맨 위에 항목을 추가한다.
   function renderAppInfo(){
     const buildEl = el('appBuildInfo');
     if(buildEl) buildEl.textContent = `버전 ${APP_BUILD}` + (CHANGELOG[0] ? ` · 최근 수정 ${CHANGELOG[0].date}` : '');
@@ -2196,7 +2350,8 @@
   el('deleteTripBtn').addEventListener('click', () => {
     if(data.trips.length <= 1){ showToast('마지막 남은 여행은 삭제할 수 없습니다'); return; }
     const trip = currentTrip();
-    if(!confirm(`'${trip.name}' 여행과 그 안의 모든 지출 내역을 삭제합니다. 계속할까요?`)) return;
+    if(!confirm(`'${trip.name}' 여행과 그 안의 모든 지출 내역을 삭제합니다. (30일 동안 설정 > 삭제 보관함에서 복구할 수 있어요) 계속할까요?`)) return;
+    trashTrip(trip, data.expenses.filter(e => e.tripId === trip.id), data.itineraryDays.filter(d => d.tripId === trip.id), data.timelineByTrip ? data.timelineByTrip[trip.id] : null);
     data.expenses = data.expenses.filter(e => e.tripId !== trip.id);
     data.itineraryDays = data.itineraryDays.filter(d => d.tripId !== trip.id);
     if(data.timelineByTrip) delete data.timelineByTrip[trip.id];
@@ -2278,11 +2433,6 @@
     const t = rawText.replace(/\s+/g, ' ').trim();
     if(!t) return null;
 
-    // 국가약칭 접두어 감지: 일부 카드사(국민카드 등)는 해외승인 문자에서 국가약칭을 공백으로
-    // 폭 맞춤한 뒤 가맹점명을 이어붙여 한 줄로 보낸다(예: "스페   MP**MARKET"). 공백을 압축하기 전
-    // 원문에서 "짧은 한글 토큰 + 공백 2칸 이상" 패턴을 찾아 그 토큰을 국가약칭으로 간주해두고,
-    // 아래에서 뽑아낸 가맹점명 앞에 그대로 붙어있으면 제거한다(일반 가맹점명은 이 패턴과 우연히도
-    // 겹치기 어려움 — 짧은 순수 한글 토큰 뒤에 공백 2칸 이상이 오는 경우가 매우 드묾).
     let countryAbbrPrefix = null;
     for(const line of rawText.split('\n')){
       const pm = line.match(/^\s*([가-힣]{1,4})\s{2,}\S/);
@@ -2317,11 +2467,6 @@
       if(m){ krwAmount = parseInt(m[1].replace(/,/g,''), 10); }
     }
     if(!krwAmount){
-      // "누적"/"잔액" 뒤에 붙은 숫자(이번 거래 금액이 아니라 누적 사용액·잔여한도)는 애초에 후보에서
-      // 제외한다. 예전엔 그 외 후보가 하나도 없으면 어쩔 수 없이 그 누적액을 그대로 썼는데,
-      // (예: "17.20 유로 ... 누적1,330,211원"처럼 해외통화 거래라 원화 표기가 아예 없는 경우)
-      // 실제 거래액과 무관한 큰 숫자가 잘못 채워지는 사고로 이어져서, 이제는 후보가 없으면 그냥
-      // 비워둔다(사용자가 직접 입력).
       const all = [...t.matchAll(/([\d,]{3,})\s*원/g)];
       const nonAccum = all.filter(x => !/(누적|잔액)\s*$/.test(t.slice(0, x.index)));
       if(nonAccum.length) krwAmount = parseInt(nonAccum[0][1].replace(/,/g,''), 10);
@@ -2400,9 +2545,6 @@
     }
     updateFxPreview();
 
-    // 날짜/시각은 el()에서 "현재 입력칸에 실제로 채워진 값"을 다시 읽는다 — 시차 변환이 일어났으면
-    // 그 결과가, 아니면 원래 파싱된 한국시간이 그대로 요약문에 보인다(이전엔 시각이 아예 요약에 없어서
-    // 시차가 잘못 적용돼도 "+ 추가"를 누르기 전까진 알아챌 방법이 없었다).
     const curDate = el('newDate').value;
     const curTime = el('newTime').value;
     const parts = [];
@@ -2460,9 +2602,6 @@
   }
 
   // ---------- 사진 방향 자동 보정 (옆으로 눕혀 찍은 영수증 사진 인식 개선) ----------
-  // 휴대폰으로 영수증을 가로로 눕혀 찍으면(세로로 긴 영수증을 한 장에 담으려고 회전해서 촬영하는 경우가 흔함)
-  // OCR이 글자를 인식하지 못하거나 엉뚱한 숫자를 읽어내는 문제가 있어, 0/90/180/270도로 각각 인식을 시도해
-  // 가장 신뢰도(confidence)가 높은 방향의 결과를 사용한다.
   function loadImageEl(file){
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
@@ -2715,10 +2854,11 @@
     if(editId) enterEditMode(editId);
     if(delId){
       if(confirm('이 지출 내역을 삭제할까요?')){
+        trashExpenses(data.expenses.filter(x=>x.id===delId));
         data.expenses = data.expenses.filter(x=>x.id!==delId);
         expandedRowIds.delete(delId);
         saveData(data); render();
-        showToast('삭제되었습니다');
+        showToast('삭제되었습니다 (설정 > 삭제 보관함에서 복구 가능)');
       }
       return;
     }
@@ -2961,9 +3101,6 @@
   el('photoClose').addEventListener('click', closePhotoModal);
   el('photoOverlay').addEventListener('click', closePhotoModal);
 
-  // 2026-09-19 추가: "도시별" 탭 태그(주소가 있든 없든 모든 지출이 이제 태그로 나온다)를 누르면 뜨는
-  // 지출 상세 팝업. 도시가 비어있는 지출이면 팝업 안에서 바로 도시를 지정할 수 있게 해서, 지도 화면까지
-  // 안 가고도 "기타"로 묶인 지출들을 그 자리에서 바로 정리할 수 있다.
   let expenseInfoOpenIds = [];
   function expenseInfoCardHtml(e){
     const catColor = tagColor(data.categories, e.category);
@@ -3219,11 +3356,6 @@
   });
 
   // ---------- 여행기록 탭 (지도 중심 — 나라 핀을 누르면 그 나라 체류기간·지출·방문장소·동선이 지도 바로 밑에서 펼쳐짐) ----------
-  // "지출내역"과 같은 위치의 새 상단 탭. 실제 지출 데이터(국가/장소/금액)만으로 만든다 — 저장된 timelineByTrip
-  // (구글 타임라인 GPS 기록)은 여행 초반 며칠치만 있고 그 뒤로는 비어 있어서, 좌표 기반 실사 지도 대신 국가가
-  // 바뀌는 순서를 이어붙인 개략도(schematic) 형태로 "경로"를 보여준다. Day별로 지출을 다시 나열하는 화면은
-  // "지출내역" 탭(dayGroups)에 이미 있어 중복이라 여기서는 만들지 않고, 지도(국가 핀) 자체를 누르면 그 나라의
-  // 요약이 펼쳐지는 쪽으로 기능을 넓혔다.
   el('mainTabs').addEventListener('click', e => {
     const btn = e.target.closest('[data-maintab]');
     if(!btn) return;
@@ -3237,9 +3369,6 @@
 
   const RECAP_DOT_COLORS = ['var(--accent)', 'var(--good)', 'var(--warn)', '#8B6FDA', '#2E86AB'];
 
-  // 여행기록(지도/미니맵/도시별)에서는 출발지인 한국을 제외한다 — 인천공항 등 출국 당일 GPS 기록이나
-  // "한국"으로 표기된 지출이 여행 동선처럼 보이는 걸 막기 위함. 지출합계(totalSpent)·전체기간(dayCount) 같은
-  // 회계용 숫자는 그대로 전체 트립 기준을 유지하고, 지도/국가목록/도시별 목록에서만 걸러낸다.
   function isKoreaCountryName(name){
     return name === '한국' || name === '대한민국';
   }
@@ -3247,9 +3376,6 @@
     return lat >= 33.0 && lat <= 38.7 && lng >= 124.5 && lng <= 131.9;
   }
 
-  // 2026-09-18 추가: "여행기록" 지도를 실제 지도(OpenStreetMap 타일, Leaflet)로 렌더링.
-  // renderRecap()이 호출될 때마다 panel.innerHTML을 통째로 새로 그리므로, 이전 지도 인스턴스는
-  // 그 DOM이 사라지기 전에 반드시 teardownRecapMap()으로 정리해줘야 한다(안 그러면 이벤트 리스너가 누적됨).
   let rcMap = null;
   let rcMarkers = [];
   let rcMiniMaps = [];
@@ -3377,16 +3503,9 @@
     return (e.city && e.city.trim()) ? e.city.trim() : null;
   }
 
-  // 2026-09-18 추가, 2026-09-19 수정: "도시별"(시안 2번) 하위 탭 — 국가(출발지 한국 제외) → 도시 2단계로 묶는다.
-  // 같은 국가 안에서 지출의 city 필드(직접 입력, 없으면 주소 기반 자동 인식) 기준으로 묶고, 둘 다 없는
-  // 지출은 그 국가의 "기타" 도시구분자 밑으로 떨어뜨려 데이터가 누락 없이 다 보이게 한다.
   function cityBucketsFromList(sortedList){
     const countryGroups = {};
     const countryOrder = [];
-    // 2026-09-19 수정: 도시 정렬을 날짜만으로 비교하면, 같은 날 안에서 방문한 여러 도시(당일치기 등)의
-    // 순서가 지출을 입력한 순서(입력 순서일 뿐 실제 방문 순서와 무관)에 좌우되던 문제가 있었다. 시각(time)이
-    // 입력된 지출은 "날짜+시각"까지 비교해 같은 날 안에서도 실제 방문한 시간 순서대로 정렬되게 한다
-    // (시각을 안 적은 지출은 그날 00:00으로 취급 — 그래도 최소한 다른 날짜와는 항상 올바르게 비교됨).
     const sortKeyOf = e => `${e.date}T${/^\d{2}:\d{2}$/.test(e.time||'') ? e.time : '00:00'}`;
     sortedList.forEach(e => {
       if(isKoreaCountryName(e.country)) return;
@@ -3437,12 +3556,6 @@
         daybarHtml = `<div class="rc-daybar"><div class="seg" style="left:${leftPct.toFixed(1)}%; width:${widthPct.toFixed(1)}%;"></div></div>`;
       }
 
-      // 2026-09-19 수정: "얼마 썼는지"가 아니라 "어딜 갔는지"가 주인공이 되도록 — 카테고리 비중은
-      // 금액이 아니라 "방문 장소 수" 기준으로 바꾸고, 장소 태그는 다 잘리지 않게 전부 보여주고,
-      // 카드 하단의 지출 총액은 뺐다(금액은 지출내역 탭에 이미 있음).
-      // 2026-09-19 재수정: 주소·상호명이 없는 지출은 예전엔 태그 목록에서 통째로 빠져서 "지도가 있는
-      // 이력만 보인다"는 문제가 있었다 — 이제는 상호명/주소가 없으면 지출 항목명(item)으로 태그를 만들어
-      // 빠짐없이 다 보여주고, 태그마다 관련 지출 id를 담아둬서 눌렀을 때 상세 팝업을 띄울 수 있게 한다.
       const placeOrder = [];
       const seenPlace = new Set();
       const placeCat = {};
@@ -3527,10 +3640,6 @@
     });
   }
 
-  // 2026-09-18 추가: 짧은 구글맵 공유링크(maps.app.goo.gl)는 링크 안에 좌표가 없어 브라우저에서 CORS 없이는
-  // 못 풀어낸다. 배포된 Apps Script(백업용 code.gs에 ?action=resolveMapUrl 처리 추가)에 링크를 넘겨
-  // 서버에서 리다이렉트를 따라가 좌표를 뽑아오게 한다. 결과는 data.placeAddrCoords에 주소별로 캐시해서
-  // 다음부터는 다시 풀지 않는다(좌표를 못 찾은 경우도 lat:null로 캐시해 매번 재시도하지 않음).
   async function resolveAddrCoord(addr){
     const url = data.settings.driveUrl;
     if(!url) return null;
@@ -3647,12 +3756,6 @@
       return '';
     }
 
-    // 실좌표 우선(순서: ①지출 주소에 직접 담긴 좌표 ②Apps Script로 풀어둔 캐시 ③구글 타임라인 GPS 기록),
-    // 2곳 미만이면 국가 등장 순서 개략도로 — recapSelectCountry는 두 경우 모두 핀의 data-country만 보고
-    // 동작해서 이 블록만 바뀌어도 선택/상세 패널 로직은 그대로 재사용된다.
-    // 2026-09-19 수정: 같은 좌표(같은 숙소 등)에 지출이 여러 건 걸리면 예전엔 "처음 본 것"으로 고정돼서,
-    // 그 자리의 나중 지출 국가/이름을 고쳐도 핀에는 안 보였다 — 이제는 같은 좌표를 다시 만나면 최신(뒤에
-    // 처리되는) 지출 내용으로 덮어써서 항상 그 좌표의 가장 최근 상태가 지도에 반영된다.
     const realPoints = [];
     const pointIndexByKey = new Map();
     sortedList.forEach(e => {
@@ -3870,16 +3973,6 @@
     }
   });
 
-  // 2026-09-18 추가: 구글 타임라인(위치기록) 내보내기 JSON(semanticSegments 형식)을 읽어, 이 여행 기간에
-  // 해당하는 "visit"(체류 지점, 좌표 있음)만 뽑아 data.timelineByTrip에 저장한다. 원본 파일에는 그 사람의
-  // 전체 위치기록(수십MB, rawSignals 등)이 다 들어있어서, 여행 기간 것만 골라내고 나머지는 버려야
-  // localStorage가 감당할 수 있다. 좌표의 시간 문자열 끝에 붙는 +00:00 같은 오프셋 표기는 내보내기 과정의
-  // 알려진 버그로 실제와 다를 수 있어(예: 영국 방문인데 +02:00으로 찍히는 등) 신뢰하지 않고, 날짜·시각은
-  // 문자열 앞부분(오프셋 무시)을 그대로 현지 시각으로 취급한다.
-  // 2026-09-19 수정: 여행 시작/종료일 앞뒤로 ±2일을 더 봐주던 패딩을 없앴다 — 그 패딩 때문에 출국 며칠
-  // 전/입국 며칠 후의 "평소(국내) 동선"까지 여행 기록으로 딸려 들어와서, 지도가 그 평소 동선(수원·대구 등)에
-  // 맞춰 확대되고 country 추정(countryForDate)도 엉뚱하게 붙는 문제가 있었다. 여행 기간(시작일~종료일)에
-  // 정확히 속하는 기록만 남긴다.
   function handleTimelineUpload(file){
     if(!file) return;
     const trip = currentTrip();
@@ -4376,14 +4469,15 @@
   }
 
   // ---------- 설정 드로어 ----------
-  function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); renderAppInfo(); }
+  function openDrawer(){ el('drawer').classList.add('show'); el('overlay').classList.add('show'); renderStorageUsage(); renderAppInfo(); renderTrash(); renderSnaps(); renderErrLog(); renderBackupSettings(); }
   function closeDrawer(){ el('drawer').classList.remove('show'); el('overlay').classList.remove('show'); }
   el('settingsToggle').addEventListener('click', openDrawer);
   el('drawerClose').addEventListener('click', closeDrawer);
   el('overlay').addEventListener('click', closeDrawer);
 
   // ---------- 내보내기 / 가져오기 ----------
-  function doExport(){
+  async function doExport(){
+    await whenPhotosReady();
     const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4398,11 +4492,15 @@
       try{
         const parsed = JSON.parse(reader.result);
         if(!parsed.trips || !parsed.expenses){ throw new Error('invalid'); }
-        if(!confirm('현재 데이터를 가져온 파일로 덮어씁니다. 계속할까요?')) return;
-        data = normalizeData(parsed);
-        saveData(data);
-        render();
-        showToast('데이터를 복원했습니다');
+        if(!confirm(`현재 데이터(지출 ${data.expenses.length}건)를 가져온 파일(지출 ${parsed.expenses.length}건)로 덮어씁니다. 지금 데이터는 이 기기에 자동 보관됩니다. 계속할까요?`)) return;
+        saveSnapshot('파일 가져오기 전').then(() => {
+          const keepUrl = data.settings.driveUrl;
+          data = normalizeData(parsed);
+          if(!data.settings.driveUrl && keepUrl) data.settings.driveUrl = keepUrl;
+          saveData(data);
+          render(); renderSnaps();
+          showToast('데이터를 복원했습니다');
+        });
       }catch(e){ showToast('올바른 백업 파일이 아닙니다'); }
     };
     reader.readAsText(file);
@@ -4415,10 +4513,11 @@
 
   // ---------- Google Drive 자동 백업 ----------
   function persistOnly(d){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }catch(e){}
+    try{ localStorage.setItem(STORAGE_KEY, serializeForStorage(d)); }catch(e){}
   }
 
   function renderBackupSettings(){
+    renderSyncBadge();
     if(document.activeElement !== el('driveUrlInput')) el('driveUrlInput').value = data.settings.driveUrl || '';
     el('autoBackupToggle').checked = !!data.settings.autoBackup;
     el('periodicBackupToggle').checked = !!data.settings.periodicBackup;
@@ -4454,40 +4553,167 @@
   });
   el('driveUrlInput').addEventListener('blur', () => { clearTimeout(driveUrlSaveTimer); saveDriveUrl(true, true); });
 
-  async function backupToDrive(silent){
+  // ---------- 백업 상태 (2026-11-14) ----------
+  const SYNC_STATE_KEY = 'travel_budget_syncstate_v1';
+  let syncState = (() => { try{ return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || 'null') || { status:'idle' }; }catch(e){ return { status:'idle' }; } })();
+  if(syncState.status === 'busy') syncState.status = 'idle';
+  function setSyncState(patch){
+    syncState = Object.assign({}, syncState, patch);
+    try{ localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(syncState)); }catch(e){}
+    renderSyncBadge();
+  }
+  function hhmm(iso){ try{ const d = new Date(iso); return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
+  function renderSyncBadge(){
+    const b = el('syncBadge');
+    if(b){
+      if(!data.settings.driveUrl){ b.style.display = 'none'; }
+      else {
+        b.style.display = '';
+        const st = syncState.status;
+        b.textContent = st === 'busy' ? '☁ 백업 중…' : st === 'fail' ? '⚠ 백업 실패 · 다시 시도' : st === 'hold' ? '⏸ 자동 백업 멈춤 · 확인 필요' : (data.settings.lastBackup ? `☁ 백업됨 ${hhmm(data.settings.lastBackup)}` : '☁ 아직 백업 전');
+        b.style.borderColor = (st === 'fail' || st === 'hold') ? 'var(--warn)' : '';
+        b.style.color = (st === 'fail' || st === 'hold') ? 'var(--warn)' : '';
+      }
+    }
+    const n = el('backupStateNote');
+    if(n){
+      n.textContent = syncState.status === 'fail' ? `⚠ 마지막 백업 실패: ${syncState.msg || '원인 미상'}` : syncState.status === 'hold' ? `⏸ ${syncState.msg || ''}` : '';
+      n.style.color = (syncState.status === 'fail' || syncState.status === 'hold') ? 'var(--warn)' : '';
+    }
+    const r = el('backupRetryRow'); if(r) r.style.display = (syncState.status === 'fail' || syncState.status === 'hold') ? 'flex' : 'none';
+    const v = el('serverVersionNote');
+    if(v) v.textContent = syncState.serverVersion ? `서버 버전 ${syncState.serverVersion}` + (syncState.serverBytes ? ` · 서버 보관 크기 약 ${(syncState.serverBytes/1048576).toFixed(2)}MB` : '') : (data.settings.driveUrl ? '서버 버전: 아직 확인 전(백업을 한 번 하면 표시됩니다)' : '');
+  }
+  function failReason(e){
+    const m = String(e && e.message || e || '');
+    if(!navigator.onLine) return '인터넷 연결이 끊겨 있어요';
+    if(/abort|timeout/i.test(m)) return '서버 응답이 60초 안에 오지 않았어요';
+    if(/Failed to fetch|NetworkError|load failed/i.test(m)) return '서버에 연결하지 못했어요 (URL·배포 설정 확인)';
+    if(/JSON|Unexpected token/i.test(m)) return '서버가 예상과 다른 응답을 보냈어요 (URL이 /exec로 끝나는지, 배포 접근 권한이 "모든 사용자"인지 확인)';
+    return m.slice(0, 140) || '원인 미상';
+  }
+  async function fetchWithTimeout(url, opt, ms){
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+    try{ return await fetch(url, Object.assign({}, opt, { signal: ctl.signal })); } finally { clearTimeout(t); }
+  }
+  // 지출 건수가 직전 백업보다 크게 줄었는지(실수로 지운 데이터가 서버 백업을 덮어쓰는 것을 막는다)
+  function shrinkWarning(){
+    const m = data.settings.lastBackupMeta; if(!m || !m.expenses) return '';
+    const now = data.expenses.length, drop = m.expenses - now;
+    if(now === 0 || (drop >= 5 && drop >= m.expenses * 0.2)) return `지출이 직전 백업(${m.expenses}건)보다 ${drop}건 줄어 ${now}건이에요.`;
+    return '';
+  }
+  let backupBusy = false;
+  async function backupToDrive(silent, force){
     const url = data.settings.driveUrl;
-    if(!url){ if(!silent) showToast('먼저 Apps Script URL을 입력해주세요'); return; }
+    if(!url){ if(!silent) showToast('먼저 Apps Script URL을 입력해주세요'); return false; }
+    if(backupBusy) return false;
+    const warn = force ? '' : shrinkWarning();
+    if(warn){
+      if(silent){ setSyncState({ status:'hold', msg: warn + ' 자동 백업을 멈췄어요. 맞으면 "다시 시도"를 눌러 주세요.' }); return false; }
+      if(!confirm(warn + '\n이 상태로 서버 백업을 덮어쓸까요?\n(실수로 지웠다면 "취소" 후 설정 > 삭제 보관함에서 복구하세요)')) return false;
+    }
+    backupBusy = true;
+    setSyncState({ status:'busy', msg:'' });
     try{
+      await whenPhotosReady();
       if(!silent) showToast('백업 중... (영수증 사진이 많으면 시간이 걸릴 수 있어요)');
-      await fetch(url, {
-        method:'POST',
-        mode:'no-cors',
-        headers:{'Content-Type':'text/plain;charset=utf-8'},
-        body: JSON.stringify(data)
-      });
+      const body = JSON.stringify(data);
+      const res = await fetchWithTimeout(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body }, 60000);
+      const json = await res.json();
+      if(!json || json.ok !== true) throw new Error(json && json.error ? '서버 오류: ' + json.error : '서버가 저장 성공을 확인해 주지 않았어요');
       data.settings.lastBackup = new Date().toISOString();
+      data.settings.lastBackupMeta = { expenses: data.expenses.length, trips: data.trips.length, bytes: body.length };
       persistOnly(data); // lastBackup 기록만 반영 (자동백업 재귀 방지)
+      setSyncState({ status:'ok', msg:'', serverVersion: json.codeVersion || syncState.serverVersion || '', serverBytes: json.length || body.length });
       renderBackupSettings();
       showToast(silent ? '자동 백업 완료' : 'Google Drive로 백업했습니다');
-    }catch(e){ if(!silent) showToast('백업 실패: URL과 배포 설정을 확인해주세요'); }
+      backupBusy = false;
+      return true;
+    }catch(e){
+      backupBusy = false;
+      setSyncState({ status:'fail', msg: failReason(e) });
+      if(!silent) showToast('백업 실패: ' + failReason(e));
+      return false;
+    }
   }
   async function restoreFromDrive(){
     const url = data.settings.driveUrl;
     if(!url){ showToast('먼저 Apps Script URL을 입력해주세요'); return; }
     try{
       showToast('불러오는 중...');
-      const res = await fetch(url, { method:'GET' });
+      const res = await fetchWithTimeout(url, { method:'GET' }, 60000);
       const json = await res.json();
-      if(!json || !json.trips || !json.expenses){ throw new Error('invalid'); }
-      if(!confirm('Drive에 백업된 데이터로 현재 데이터를 덮어씁니다. 계속할까요?')) return;
+      if(json && json.error) throw new Error(json.error);
+      if(!json || !json.trips || !json.expenses){ throw new Error('서버 백업이 올바른 형식이 아니에요'); }
+      const fewer = json.expenses.length < data.expenses.length ? `\n⚠ 서버 백업(${json.expenses.length}건)이 지금 데이터(${data.expenses.length}건)보다 적어요.` : '';
+      if(!confirm(`Drive에 백업된 데이터(지출 ${json.expenses.length}건)로 현재 데이터(지출 ${data.expenses.length}건)를 덮어씁니다.${fewer}\n지금 데이터는 이 기기에 자동 보관됩니다. 계속할까요?`)) return;
+      await saveSnapshot('Drive 복원 전');
       const restoredUrl = url;
       data = normalizeData(json);
       data.settings.driveUrl = restoredUrl;
+      data.settings.lastBackupMeta = { expenses: data.expenses.length, trips: data.trips.length, bytes: 0 };
       saveData(data);
       render();
+      renderSnaps();
       showToast('Drive에서 데이터를 불러왔습니다');
-    }catch(e){ showToast('불러오기 실패: URL과 배포 설정을 확인해주세요 (CORS/권한)'); }
+    }catch(e){ showToast('불러오기 실패: ' + failReason(e)); }
   }
+  async function renderSnaps(){
+    const box = el('snapList'); if(!box) return;
+    if(!photoDb){ box.innerHTML = '<p class="note">이 브라우저에서는 자동 보관을 쓸 수 없습니다.</p>'; return; }
+    try{
+      const all = await idbReq('snaps', 'readonly', st => st.getAll());
+      const list = (all || []).sort((a,b) => b.at - a.at);
+      if(!list.length){ box.innerHTML = '<p class="note">보관본이 없습니다.</p>'; return; }
+      box.innerHTML = list.map(s => `<div style="display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line2);"><div style="flex:1; font-size:12.5px;">${new Date(s.at).toLocaleString('ko-KR')}<div class="note">${escapeHtml(s.reason || '')} · 여행 ${s.trips}개 · 지출 ${s.expenses}건</div></div><button class="toolbtn" data-snap-restore="${s.at}">되돌리기</button></div>`).join('');
+    }catch(e){ box.innerHTML = '<p class="note">보관본을 읽지 못했습니다.</p>'; }
+  }
+  async function restoreSnap(key){
+    try{
+      const s = await idbReq('snaps', 'readonly', st => st.get(Number(key)));
+      if(!s || !s.json) return;
+      const parsed = JSON.parse(s.json);
+      if(!confirm(`${new Date(s.at).toLocaleString('ko-KR')} 보관본(지출 ${s.expenses}건)으로 되돌릴까요? 지금 데이터도 보관본으로 남깁니다.`)) return;
+      await saveSnapshot('보관본 되돌리기 전');
+      const keepUrl = data.settings.driveUrl;
+      data = normalizeData(parsed); if(keepUrl) data.settings.driveUrl = keepUrl;
+      saveData(data); render(); renderSnaps();
+      showToast('보관본으로 되돌렸습니다');
+    }catch(e){ showToast('되돌리기 실패'); }
+  }
+  function renderErrLog(){ const b = el('errLogList'); if(b && window.AppErrLog) b.innerHTML = window.AppErrLog.html(); }
+  el('errLogCopyBtn').addEventListener('click', () => {
+    const txt = window.AppErrLog ? window.AppErrLog.text('여행경비 ' + APP_BUILD) : '';
+    (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => showToast('오류 기록을 복사했습니다')).catch(() => { window.prompt('아래 내용을 복사하세요', txt); });
+  });
+  el('errLogClearBtn').addEventListener('click', () => { if(window.AppErrLog) window.AppErrLog.clear(); renderErrLog(); });
+  el('trashList').addEventListener('click', e => { const b = e.target.closest('[data-trash-restore]'); if(b) restoreTrash(b.dataset.trashRestore); });
+  el('snapList').addEventListener('click', e => { const b = e.target.closest('[data-snap-restore]'); if(b) restoreSnap(b.dataset.snapRestore); });
+  el('backupRetryBtn').addEventListener('click', () => backupToDrive(false, true));
+  el('syncBadge').addEventListener('click', () => {
+    if(syncState.status === 'fail' || syncState.status === 'hold'){ if(confirm((syncState.msg || '백업에 실패했어요.') + '\n\n지금 다시 백업할까요?')) backupToDrive(false, syncState.status === 'hold'); }
+    else if(syncState.status !== 'busy'){ backupToDrive(false); }
+  });
+  window.addEventListener('online', () => { if(syncState.status === 'fail' && data.settings.autoBackup) backupToDrive(true); });
+
+  // ---------- 새 버전 안내 (2026-11-14) ----------
+  async function checkNewVersion(){
+    if(location.protocol === 'file:' || !navigator.onLine) return;
+    try{
+      const res = await fetch('./index.html?vc=' + Date.now(), { cache:'no-store' });
+      if(!res.ok) return;
+      const m = (await res.text()).match(/const APP_BUILD = '([^']+)'/);
+      if(m && m[1] !== APP_BUILD && sessionStorage.getItem('tb_upd_dismiss') !== m[1]){
+        el('updateBanner').style.display = 'flex'; el('updateBanner').dataset.ver = m[1];
+      }
+    }catch(e){}
+  }
+  el('updateBannerBtn').addEventListener('click', () => location.reload());
+  el('updateBannerClose').addEventListener('click', () => { try{ sessionStorage.setItem('tb_upd_dismiss', el('updateBanner').dataset.ver || ''); }catch(e){} el('updateBanner').style.display = 'none'; });
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkNewVersion(); });
+  setTimeout(checkNewVersion, 8000);
+
   el('driveSyncNowBtn').addEventListener('click', () => {
     if(!data.settings.driveUrl){ openDrawer(); showToast('Google Drive 백업 URL을 먼저 설정해주세요'); return; }
     backupToDrive(false);
@@ -4591,10 +4817,6 @@
     el('installBtn').style.display = 'none';
   });
   window.addEventListener('appinstalled', () => { el('installBtn').style.display = 'none'; });
-  // 2026-09-19 추가: 홈 화면에 추가해서 "앱처럼"(PWA standalone) 쓸 때, target="_blank" 링크(구글지도 주소
-  // 등)가 새 탭을 열긴 열되 그 탭이 제한된 인앱 웹뷰라 구글지도 같은 외부 사이트가 빈 화면/오류로 뜨는
-  // iOS의 알려진 문제가 있음. standalone 모드에서는 새 탭 대신 현재 창에서 그대로 이동시켜서(그러면 OS가
-  // 정상적으로 지도 앱이나 사파리로 넘겨줌) 이 문제를 피한다.
   const isStandaloneApp = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   if(isStandaloneApp){
     document.addEventListener('click', e => {

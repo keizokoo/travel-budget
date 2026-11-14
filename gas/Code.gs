@@ -13,10 +13,19 @@
  *   - ?action=resolveCity&lat=...&lng=... 파라미터가 있으면 resolveCity_()를 실행합니다
  *     (2026-09-19 추가 — 아래 설명 참고).
  *   - 기존 방식(파라미터 없이 호출)은 그대로 동작합니다.
+ *
+ * [2026-11-14] 앱 2026-11-14-a와 짝
+ *   - doPost: 동시에 두 번 저장이 들어와도 섞이지 않게 잠금(LockService) 추가.
+ *     올바른 형식(trips·expenses 배열)이 아니면 저장하지 않고 오류를 돌려줌(빈 값이 백업을 덮어쓰는 사고 방지).
+ *     응답에 codeVersion·length 추가(앱이 "실제로 저장됐는지"와 서버 버전을 확인).
+ *   - 이력 보관 5개 → 10개.
+ *   - doGet ?action=meta: 서버 버전과 마지막 백업 시각·크기만 가볍게 돌려줌(읽기 전용).
  */
 
+var CODE_VERSION = '2026-11-14';
+
 var FOLDER_NAME = '여행경비트래커_백업';
-var HISTORY_LIMIT = 5;
+var HISTORY_LIMIT = 10;
 
 function getBackupFolder() {
   var folders = DriveApp.getFoldersByName(FOLDER_NAME);
@@ -29,8 +38,16 @@ function getHistoryFolder(parentFolder) {
 }
 
 function doPost(e) {
+  var lock = LockService.getScriptLock();
+  var locked = false;
   try {
+    lock.waitLock(25000);
+    locked = true;
     var payload = e.postData.contents;
+    var parsed = JSON.parse(payload);
+    if (!parsed || !Array.isArray(parsed.trips) || !Array.isArray(parsed.expenses)) {
+      throw new Error('백업 형식이 올바르지 않아 저장하지 않았습니다');
+    }
     var folder = getBackupFolder();
 
     // 1) 최신 백업 파일 (매번 덮어씀 - 복원 시 이걸 읽음)
@@ -55,13 +72,30 @@ function doPost(e) {
     }
 
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true, savedAt: new Date().toISOString() }))
+      .createTextOutput(JSON.stringify({ ok: true, savedAt: new Date().toISOString(), length: payload.length, expenses: parsed.expenses.length, codeVersion: CODE_VERSION }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, error: String(err) }))
+      .createTextOutput(JSON.stringify({ ok: false, error: String(err), codeVersion: CODE_VERSION }))
       .setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    if (locked) { try { lock.releaseLock(); } catch (x) { /* 무시 */ } }
   }
+}
+
+/** 서버 버전·마지막 백업 정보만 가볍게 돌려준다(읽기 전용). */
+function metaResponse_() {
+  var out = { ok: true, codeVersion: CODE_VERSION, hasBackup: false };
+  try {
+    var files = getBackupFolder().getFilesByName('latest.json');
+    if (files.hasNext()) {
+      var f = files.next();
+      out.hasBackup = true;
+      out.savedAt = f.getLastUpdated().toISOString();
+      out.length = f.getSize();
+    }
+  } catch (err) { out.ok = false; out.error = String(err); }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
 /**
@@ -77,6 +111,9 @@ function doPost(e) {
  * 기존 호출(백업 복원)은 이 분기를 그대로 지나쳐 아래의 원래 로직을 한 글자도 바꾸지 않고 그대로 탄다.
  */
 function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'meta') {
+    return metaResponse_();
+  }
   if (e && e.parameter && e.parameter.action === 'resolveMapUrl' && e.parameter.url) {
     return resolveMapUrl_(e.parameter.url);
   }
