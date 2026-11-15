@@ -851,6 +851,10 @@
           <input type="date" id="tripEndInput">
         </div>
       </div>
+      <div class="fieldrow">
+        <label>예산(원, 선택)</label>
+        <input type="number" step="1000" min="0" inputmode="numeric" id="tripBudgetInput" placeholder="예: 3000000">
+      </div>
       <button class="toolbtn" id="saveTripBtn" style="width:100%; justify-content:center;">현재 여행 정보 저장</button>
     </div>
 
@@ -890,7 +894,7 @@
 
     <div class="block">
       <h4>환율 관리</h4>
-      <p class="note" style="margin-bottom:10px;">여기서 저장해두면 해당 통화로 지출을 추가하거나 카드승인 문자를 인식할 때 환율이 자동으로 채워집니다.</p>
+      <p class="note" style="margin-bottom:10px;">여기서 저장해두면 해당 통화로 지출을 추가하거나 카드승인 문자를 인식할 때 환율이 자동으로 채워집니다. "자동 조회"는 인터넷에서 최근 환율을 가져와 칸에 채워주기만 합니다 — 실제 카드 승인 환율과 다를 수 있으니 확인 후 저장해주세요.</p>
       <div id="fxRatePanel"></div>
     </div>
 
@@ -1077,8 +1081,9 @@
   const DEFAULT_COUNTRIES = ["영국","스페인","한국"];
   const DEFAULT_CURRENCIES = ["KRW","GBP","EUR"];
 
-  const APP_BUILD = '2026-11-14-a';
+  const APP_BUILD = '2026-11-15-a';
   const CHANGELOG = [
+    { date: '2026-11-15', note: '환율 관리에 "자동 조회" 버튼 추가(Frankfurter, 무료·키 없음) — 최근 환율을 칸에 채워주고 저장은 직접 눌러야 함(카드 승인 환율과 다를 수 있음). 여행 설정에 "예산(원)" 입력 추가 — 설정하면 상단에 지출 건수 대신 예산 대비 남은 금액(또는 초과액)을 표시.' },
     { date: '2026-11-14', note: '안전장치 묶음(Code.gs 2026-11-14와 짝) — ① 백업이 실제로 저장됐는지 서버 응답을 확인(이전에는 실패해도 "완료"로 표시됨) ② 화면 위 백업 상태 배지(실패 사유·다시 시도) ③ 삭제 보관함(지운 지출·여행 30일 보관·복구) ④ 지출 건수가 크게 줄면 자동 백업을 멈추고 확인 ⑤ 복원·가져오기 직전 데이터를 이 기기에 자동 보관 ⑥ 영수증 사진을 사진 전용 저장소로 옮겨 저장공간 부족 방지 ⑦ 새 버전 안내 ⑧ 지도·글자 인식 파일을 기기에 저장해 인터넷이 끊겨도 한 번 본 지도는 표시 ⑨ 오류 기록 화면 ⑩ 서버 버전 표시.' },
     { date: '2026-09-19', note: '여행기록 상단 요약 카드 3번째 칸을 "전체 지출"에서 "방문 도시"(국가+도시 조합 개수)로 교체(지출 총액은 지출내역 탭에 이미 있어 중복 제거). "도시별" 탭 개선 4가지 — ① 같은 날 안에서 여러 도시를 방문했을 때 지출 입력 순서가 아니라 시각(입력 안 한 지출은 00:00 취급) 기준으로 정렬되도록 고쳐서, 스페인처럼 같은 날 이동이 겹치는 경우에도 실제 방문 순서대로 도시가 나열됨(그래도 순서가 이상하면 그 지출의 날짜 자체가 잘못 입력됐을 가능성이 크니 지출내역에서 확인 필요). ② 도시 카드에 "Day N" 대신 실제 달력 날짜(예: 9/10 – 9/13) 체류 기간 표시 추가. ③ 상호명·주소가 없는 지출도 태그로 빠짐없이 표시되도록 바꿈(전엔 주소/상호명 있는 지출만 보였음) — 태그를 누르면 그 지출 상세 팝업이 뜨고, 지도 링크·메모까지 확인 가능. ④ 도시를 지정 안 한 지출("기타")은 카드에 경고 문구와 함께 몇 건인지 표시되고, 태그를 눌러 뜨는 팝업 안에서 그 자리에서 바로 도시를 골라 지정할 수 있음(구글지도 주소가 있으면 팝업에 그대로 보여줘서 어디였는지 확인하며 고를 수 있음) — 영국 "기타"처럼 도시가 비어서 뭉뚱그려지던 지출들을 빠짐없이 찾아 하나씩 정리 가능. 홈 화면에 추가해 앱처럼(PWA standalone) 쓸 때 구글지도 주소 링크를 누르면 새 탭이 빈 화면/오류로 뜨던 iOS 문제 수정 — standalone 모드에서는 새 탭 대신 현재 창에서 바로 이동시켜 정상적으로 지도로 연결되게 함(적용되려면 앱을 완전히 종료 후 다시 열어야 함).' },
     { date: '2026-09-19', note: '도시 입력 방식을 전면 개편 — 자유입력 텍스트 칸을 없애고, 국가별로 등록해둔 도시 목록에서 드롭다운으로 선택하도록 바꿈. 설정에 "도시 관리" 화면을 새로 추가해 국가마다 도시를 추가·이름수정·삭제할 수 있고(카테고리/국가/통화 관리와 같은 방식), 지출 추가 화면에서도 "+ 새 도시 추가"로 바로 등록 가능. 예전엔 지출 수정 화면에 도시 입력칸 자체가 없어서 한 번 잘못 입력하거나 비워둔 도시를 고칠 방법이 없었는데, 이제 수정 화면에도 도시 드롭다운이 추가되어 언제든 바로잡을 수 있음. 기존에 자유입력으로 넣어뒀던 도시명(런던·바르셀로나 등)은 전부 자동으로 새 도시 목록에 편입되어 그대로 드롭다운에 나타남. 정확도가 낮았던 "도시별" 탭의 주소 기반 자동 인식(역지오코딩)과 "구간별 도시 일괄 지정" 도구는 이번 방식으로 대체되어 제거됨.' },
@@ -1813,10 +1818,45 @@
       <div class="fxrate-row" data-cur="${escapeHtml(c)}">
         <span class="fxrate-label">${escapeHtml(c)}</span>
         <input type="number" step="0.01" min="0" inputmode="decimal" placeholder="환율 (예: 1750)" value="${data.lastFxRate[c] || ''}">
+        <button data-fetch-fxrate="${escapeHtml(c)}" class="toolbtn" title="최근 환율 자동으로 가져오기">🔄 자동 조회</button>
         <button data-save-fxrate="${escapeHtml(c)}">저장</button>
       </div>
     `).join('');
   }
+  // 2026-11-15 추가(제안서 14번): 환율 자동 조회. Frankfurter(ECB 기준, 무료·키 없음)에서 KRW 환율을 받아
+  // 칸에 채우기만 한다 — 저장은 사용자가 "저장" 버튼을 눌러야 하고, 카드 승인 문자의 실제 환율과 다를 수
+  // 있음을 환율 관리 안내문에 명시했다. 실패해도 기존처럼 수동 입력이 그대로 동작한다(회귀 없음).
+  async function fetchFxRateAuto_(currency){
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 8000);
+    try{
+      const res = await fetch(`https://api.frankfurter.app/latest?from=${encodeURIComponent(currency)}&to=KRW`, {signal: controller.signal});
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const rate = json && json.rates && json.rates.KRW;
+      if(!rate || !isFinite(rate)) throw new Error('환율 없음');
+      return rate;
+    } finally { clearTimeout(timer); }
+  }
+  el('fxRatePanel').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-fetch-fxrate]');
+    if(!btn) return;
+    const cur = btn.getAttribute('data-fetch-fxrate');
+    const row = btn.closest('.fxrate-row');
+    const input = row ? row.querySelector('input[type="number"]') : null;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '조회 중...';
+    try{
+      const rate = await fetchFxRateAuto_(cur);
+      if(input) input.value = Math.round(rate * 100) / 100;
+      showToast(`${cur} 최근 환율 ${won(rate)}을 가져왔어요 — 확인 후 저장해주세요`);
+    }catch(err){
+      showToast('환율 조회에 실패했어요(인터넷 연결 확인) — 직접 입력해주세요');
+      console.error('환율 자동 조회 실패:', err);
+    }finally{
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
 
   // ---------- 필터/정렬 ----------
   let searchTerm = '';
@@ -2287,13 +2327,24 @@
     list.forEach(e => { catTotals[e.category] = (catTotals[e.category]||0) + e.amountKrw; });
     const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
     const topCatHtml = topCat ? ` · 최다 <b>${escapeHtml(topCat[0])} ${Math.round(topCat[1]/(spent||1)*100)}%</b>` : '';
-    el('heroSubLine').innerHTML = `<b>${list.length}건</b>${dayCount}${topCatHtml}`;
+    // 2026-11-15 추가(제안서 14번): 예산이 설정된 여행이면 지출 건수 대신 예산 대비 남은 금액을 보여준다(둘 다 공간이 좁아 하나만 표시).
+    if(trip.budget && trip.budget > 0){
+      const remain = trip.budget - spent;
+      const pct = Math.min(999, Math.round(spent / trip.budget * 100));
+      const remainHtml = remain >= 0
+        ? `예산 ${won(trip.budget)} 중 <b>${won(remain)}</b> 남음(${pct}% 사용)`
+        : `예산 ${won(trip.budget)} 초과 <b style="color:var(--warn);">${won(-remain)}</b>`;
+      el('heroSubLine').innerHTML = `${remainHtml}${dayCount}${topCatHtml}`;
+    } else {
+      el('heroSubLine').innerHTML = `<b>${list.length}건</b>${dayCount}${topCatHtml}`;
+    }
 
     el('newDate').value = (trip.startDate && todayStr() < trip.startDate) ? trip.startDate : (trip.startDate && todayStr() > trip.endDate ? trip.endDate : todayStr());
 
     el('tripNameInput').value = trip.name;
     el('tripStartInput').value = trip.startDate || '';
     el('tripEndInput').value = trip.endDate || '';
+    el('tripBudgetInput').value = trip.budget || '';
 
     renderCategoryPanel();
     renderCountryPanel();
@@ -2343,6 +2394,8 @@
     trip.name = el('tripNameInput').value.trim() || trip.name;
     trip.startDate = el('tripStartInput').value || '';
     trip.endDate = el('tripEndInput').value || '';
+    const budgetVal = Number(el('tripBudgetInput').value) || 0; // 2026-11-15 추가(제안서 14번): 0 또는 빈 값이면 예산 미설정으로 취급
+    trip.budget = budgetVal > 0 ? budgetVal : 0;
     saveData(data);
     render();
     showToast('여행 정보가 저장되었습니다');
