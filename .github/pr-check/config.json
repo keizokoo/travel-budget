@@ -1,0 +1,9 @@
+{
+  "htmlFiles": ["index.html"],
+  "jsFiles": ["gas/Code.gs"],
+  "versionChecks": [
+    {"file": "index.html", "pattern": "const APP_BUILD = '[^']*'", "label": "APP_BUILD"},
+    {"file": "gas/Code.gs", "pattern": "CODE_VERSION = '[^']*'", "label": "CODE_VERSION"},
+    {"file": "sw.js", "pattern": "const CACHE_NAME = '[^']*'", "label": "CACHE_NAME"}
+  ]
+}
