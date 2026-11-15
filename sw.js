@@ -4,7 +4,7 @@
 //   한 번 받으면 기기에 저장해 둔다 → 해외에서 인터넷이 끊겨도 지도 틀과 한 번 본 지역 지도, 영수증 인식이 동작.
 // - Apps Script(백업) 등 그 밖의 외부 요청은 건드리지 않는다.
 
-const CACHE_NAME = 'travel-budget-cache-v2';       // 배포할 때마다 숫자를 올린다
+const CACHE_NAME = 'travel-budget-cache-v3';       // 배포할 때마다 숫자를 올린다
 const EXT_CACHE = 'travel-budget-ext-v1';          // 외부 라이브러리·글꼴 (버전이 주소에 들어 있어 오래 보관)
 const TILE_CACHE = 'travel-budget-tiles-v1';       // 지도 타일 (최대 TILE_MAX장)
 const TILE_MAX = 800;
